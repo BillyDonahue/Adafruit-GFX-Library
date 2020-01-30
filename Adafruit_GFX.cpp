@@ -86,18 +86,13 @@ inline uint8_t *pgm_read_bitmap_ptr(const GFXfont *gfxFont) {
 #endif //__AVR__
 }
 
-#ifndef min
-#define min(a, b) (((a) < (b)) ? (a) : (b))
-#endif
+template <typename T> static T &_min(T &a, T &b) { return a < b ? a : b; }
 
-#ifndef _swap_int16_t
-#define _swap_int16_t(a, b)                                                    \
-  {                                                                            \
-    int16_t t = a;                                                             \
-    a = b;                                                                     \
-    b = t;                                                                     \
-  }
-#endif
+static inline void _swap_int16_t(int16_t &a, int16_t &b) {
+  int16_t t = a;
+  a = b;
+  b = t;
+}
 
 /**************************************************************************/
 /*!
@@ -1427,6 +1422,15 @@ void Adafruit_GFX::charBounds(char c, int16_t *x, int16_t *y, int16_t *minx,
   }
 }
 
+void Adafruit_GFX::applyRotation(int16_t &x, int16_t &y) const {
+  if (rotation == 1 || rotation == 3)
+    _swap_int16_t(x, y);
+  if (rotation == 1 || rotation == 2)
+    x = WIDTH - 1 - x;
+  if (rotation == 2 || rotation == 3)
+    y = HEIGHT - 1 - y;
+}
+
 /**************************************************************************/
 /*!
     @brief    Helper to determine size of a string with current font/size. Pass
@@ -1673,7 +1677,7 @@ void Adafruit_GFX_Button::drawButton(boolean inverted) {
     text = _fillcolor;
   }
 
-  uint8_t r = min(_w, _h) / 4; // Corner radius
+  uint8_t r = _min(_w, _h) / 4; // Corner radius
   _gfx->fillRoundRect(_x1, _y1, _w, _h, r, fill);
   _gfx->drawRoundRect(_x1, _y1, _w, _h, r, outline);
 
@@ -1780,23 +1784,7 @@ void GFXcanvas1::drawPixel(int16_t x, int16_t y, uint16_t color) {
     if ((x < 0) || (y < 0) || (x >= _width) || (y >= _height))
       return;
 
-    int16_t t;
-    switch (rotation) {
-    case 1:
-      t = x;
-      x = WIDTH - 1 - y;
-      y = t;
-      break;
-    case 2:
-      x = WIDTH - 1 - x;
-      y = HEIGHT - 1 - y;
-      break;
-    case 3:
-      t = x;
-      x = y;
-      y = HEIGHT - 1 - t;
-      break;
-    }
+    applyRotation(x, y);
 
     uint8_t *ptr = &buffer[(x / 8) + y * ((WIDTH + 7) / 8)];
 #ifdef __AVR__
@@ -1862,25 +1850,7 @@ void GFXcanvas8::drawPixel(int16_t x, int16_t y, uint16_t color) {
   if (buffer) {
     if ((x < 0) || (y < 0) || (x >= _width) || (y >= _height))
       return;
-
-    int16_t t;
-    switch (rotation) {
-    case 1:
-      t = x;
-      x = WIDTH - 1 - y;
-      y = t;
-      break;
-    case 2:
-      x = WIDTH - 1 - x;
-      y = HEIGHT - 1 - y;
-      break;
-    case 3:
-      t = x;
-      x = y;
-      y = HEIGHT - 1 - t;
-      break;
-    }
-
+    applyRotation(x, y);
     buffer[x + y * WIDTH] = color;
   }
 }
@@ -1914,24 +1884,7 @@ void GFXcanvas8::writeFastHLine(int16_t x, int16_t y, int16_t w,
   if (x2 >= _width)
     w = _width - x;
 
-  int16_t t;
-  switch (rotation) {
-  case 1:
-    t = x;
-    x = WIDTH - 1 - y;
-    y = t;
-    break;
-  case 2:
-    x = WIDTH - 1 - x;
-    y = HEIGHT - 1 - y;
-    break;
-  case 3:
-    t = x;
-    x = y;
-    y = HEIGHT - 1 - t;
-    break;
-  }
-
+  applyRotation(x, y);
   memset(buffer + y * WIDTH + x, color, w);
 }
 
@@ -1954,10 +1907,7 @@ GFXcanvas16::GFXcanvas16(uint16_t w, uint16_t h) : Adafruit_GFX(w, h) {
    @brief    Delete the canvas, free memory
 */
 /**************************************************************************/
-GFXcanvas16::~GFXcanvas16(void) {
-  if (buffer)
-    free(buffer);
-}
+GFXcanvas16::~GFXcanvas16(void) { free(buffer); }
 
 /**************************************************************************/
 /*!
@@ -1971,25 +1921,7 @@ void GFXcanvas16::drawPixel(int16_t x, int16_t y, uint16_t color) {
   if (buffer) {
     if ((x < 0) || (y < 0) || (x >= _width) || (y >= _height))
       return;
-
-    int16_t t;
-    switch (rotation) {
-    case 1:
-      t = x;
-      x = WIDTH - 1 - y;
-      y = t;
-      break;
-    case 2:
-      x = WIDTH - 1 - x;
-      y = HEIGHT - 1 - y;
-      break;
-    case 3:
-      t = x;
-      x = y;
-      y = HEIGHT - 1 - t;
-      break;
-    }
-
+    applyRotation(x, y);
     buffer[x + y * WIDTH] = color;
   }
 }

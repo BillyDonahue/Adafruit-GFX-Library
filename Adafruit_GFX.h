@@ -222,6 +222,13 @@ public:
 protected:
   void charBounds(char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny,
                   int16_t *maxx, int16_t *maxy);
+
+  /*!
+    @brief modify 'x' and 'y' in-place, transforming into the unrotated
+    coordinates.
+  */
+  void applyRotation(int16_t &x, int16_t &y) const;
+
   int16_t WIDTH,      ///< This is the 'raw' display width - never changes
       HEIGHT;         ///< This is the 'raw' display height - never changes
   int16_t _width,     ///< Display width as modified by current rotation
