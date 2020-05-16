@@ -86,15 +86,17 @@ inline uint8_t *pgm_read_bitmap_ptr(const GFXfont *gfxFont) {
 #endif //__AVR__
 }
 
-template <typename T>
-static inline const T& _min(const T& a, const T& b) {
-  return a < b ? a: b;
+template <typename T> static inline const T &_min(const T &a, const T &b) {
+  return a < b ? a : b;
+}
+template <typename T> static inline const T &_max(const T &a, const T &b) {
+  return a > b ? a : b;
 }
 
-static inline void _swap_int16_t(int16_t& a, int16_t& b) {                                      
-  int16_t t = a;                      
-  a = b;                             
-  b = t;                            
+static inline void _swap_int16_t(int16_t &a, int16_t &b) {
+  int16_t t = a;
+  a = b;
+  b = t;
 }
 
 class ClassicFont : public Adafruit_GFX::Font {
@@ -140,7 +142,7 @@ public:
     return &_active;
   }
 
-  bool _cp437 = false;       ///< If set, use correct CP437 charset (default is off)
+  bool _cp437 = false; ///< If set, use correct CP437 charset (default is off)
   mutable Glyph _active;
 };
 
@@ -155,23 +157,24 @@ class CustomFont : public Adafruit_GFX::Font {
     void draw(Adafruit_GFX::GlyphDraw &ctx) const override;
 
     GFXglyph *glyph;
-    uint8_t *bitmap;  // Start of this glyph's bitmap, not the whole font's bitmaps.
+    uint8_t
+        *bitmap; // Start of this glyph's bitmap, not the whole font's bitmaps.
   };
 
 public:
-  explicit CustomFont(const GFXfont* f) : gfxFont(f) {}
+  explicit CustomFont(const GFXfont *f) : gfxFont(f) {}
 
   uint8_t yAdvance() const override {
     return pgm_read_byte(&gfxFont->yAdvance);
   }
 
-  Adafruit_GFX::Glyph* getGlyph(uint16_t ch) const override;
+  Adafruit_GFX::Glyph *getGlyph(uint16_t ch) const override;
 
   const GFXfont *gfxFont;
   mutable Glyph activeGlyph;
 };
 
-Adafruit_GFX::Glyph* CustomFont::getGlyph(uint16_t ch) const {
+Adafruit_GFX::Glyph *CustomFont::getGlyph(uint16_t ch) const {
   uint16_t first = pgm_read_byte(&gfxFont->first);
   uint16_t last = pgm_read_byte(&gfxFont->last);
   if (ch < first || ch > last)
@@ -185,11 +188,21 @@ Adafruit_GFX::Glyph* CustomFont::getGlyph(uint16_t ch) const {
   return &activeGlyph;
 }
 
-uint8_t CustomFont::Glyph::width() const { return pgm_read_byte(&glyph->width); }
-uint8_t CustomFont::Glyph::height() const { return pgm_read_byte(&glyph->height); }
-uint8_t CustomFont::Glyph::xAdvance() const { return pgm_read_byte(&glyph->xAdvance); }
-int8_t CustomFont::Glyph::xOffset() const { return pgm_read_byte(&glyph->xOffset); }
-int8_t CustomFont::Glyph::yOffset() const { return pgm_read_byte(&glyph->yOffset); }
+uint8_t CustomFont::Glyph::width() const {
+  return pgm_read_byte(&glyph->width);
+}
+uint8_t CustomFont::Glyph::height() const {
+  return pgm_read_byte(&glyph->height);
+}
+uint8_t CustomFont::Glyph::xAdvance() const {
+  return pgm_read_byte(&glyph->xAdvance);
+}
+int8_t CustomFont::Glyph::xOffset() const {
+  return pgm_read_byte(&glyph->xOffset);
+}
+int8_t CustomFont::Glyph::yOffset() const {
+  return pgm_read_byte(&glyph->yOffset);
+}
 
 void CustomFont::Glyph::draw(Adafruit_GFX::GlyphDraw &ctx) const {
   uint16_t bo = 0;
@@ -230,7 +243,6 @@ void CustomFont::Glyph::draw(Adafruit_GFX::GlyphDraw &ctx) const {
   }
 }
 
-
 /**************************************************************************/
 /*!
    @brief    Instatiate a GFX context for graphics! Can only be done by a
@@ -251,9 +263,7 @@ Adafruit_GFX::Adafruit_GFX(int16_t w, int16_t h) : WIDTH(w), HEIGHT(h) {
   font->useCorrectCodePage437(false);
 }
 
-Adafruit_GFX::~Adafruit_GFX() {
-  delete font;
-}
+Adafruit_GFX::~Adafruit_GFX() { delete font; }
 
 /**************************************************************************/
 /*!
@@ -1285,7 +1295,7 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
 
     void setPixel(int16_t x, int16_t y, bool set) const override {
       if (sx == 1 && sy == 1) {
-          gfx->writePixel(x + x0, y + y0, set ? fg : bg);
+        gfx->writePixel(x + x0, y + y0, set ? fg : bg);
       } else {
         // Make a little box to accomodate scaling.
         x *= sx;
@@ -1341,7 +1351,8 @@ size_t Adafruit_GFX::write(uint8_t c) {
     cursor_y += textsize_y * font->yAdvance();
   }
 
-  drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize_x, textsize_y);
+  drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize_x,
+           textsize_y);
   cursor_x += textsize_x * g->xAdvance(); // Advance x one char
   return 1;
 }
@@ -1423,67 +1434,37 @@ void Adafruit_GFX::setFont(const GFXfont *f) {
 void Adafruit_GFX::charBounds(unsigned char c, int16_t *x, int16_t *y,
                               int16_t *minx, int16_t *miny, int16_t *maxx,
                               int16_t *maxy) {
-
-#if 0
-  if (gfxFont) {
-
-    if (c == '\n') { // Newline?
-      *x = 0;        // Reset x to zero, advance y by one line
-      *y += textsize_y * (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-    } else if (c != '\r') { // Not a carriage return; is normal char
-      uint8_t first = pgm_read_byte(&gfxFont->first),
-              last = pgm_read_byte(&gfxFont->last);
-      if ((c >= first) && (c <= last)) { // Char present in this font?
-        GFXglyph *glyph = pgm_read_glyph_ptr(gfxFont, c - first);
-        uint8_t gw = pgm_read_byte(&glyph->width),
-                gh = pgm_read_byte(&glyph->height),
-                xa = pgm_read_byte(&glyph->xAdvance);
-        int8_t xo = pgm_read_byte(&glyph->xOffset),
-               yo = pgm_read_byte(&glyph->yOffset);
-        if (wrap && ((*x + (((int16_t)xo + gw) * textsize_x)) > _width)) {
-          *x = 0; // Reset x to zero, advance y by one line
-          *y += textsize_y * (uint8_t)pgm_read_byte(&gfxFont->yAdvance);
-        }
-        int16_t tsx = (int16_t)textsize_x, tsy = (int16_t)textsize_y,
-                x1 = *x + xo * tsx, y1 = *y + yo * tsy, x2 = x1 + gw * tsx - 1,
-                y2 = y1 + gh * tsy - 1;
-        if (x1 < *minx)
-          *minx = x1;
-        if (y1 < *miny)
-          *miny = y1;
-        if (x2 > *maxx)
-          *maxx = x2;
-        if (y2 > *maxy)
-          *maxy = y2;
-        *x += xa * tsx;
-      }
-    }
-
-  } else { // Default font
-
-    if (c == '\n') {        // Newline?
-      *x = 0;               // Reset x to zero,
-      *y += textsize_y * 8; // advance y one line
-      // min/max x/y unchaged -- that waits for next 'normal' character
-    } else if (c != '\r') { // Normal char; ignore carriage returns
-      if (wrap && ((*x + textsize_x * 6) > _width)) { // Off right?
-        *x = 0;                                       // Reset x to zero,
-        *y += textsize_y * 8;                         // advance y one line
-      }
-      int x2 = *x + textsize_x * 6 - 1, // Lower-right pixel of char
-          y2 = *y + textsize_y * 8 - 1;
-      if (x2 > *maxx)
-        *maxx = x2; // Track max x, y
-      if (y2 > *maxy)
-        *maxy = y2;
-      if (*x < *minx)
-        *minx = *x; // Track min x, y
-      if (*y < *miny)
-        *miny = *y;
-      *x += textsize_x * 6; // Advance x one char
-    }
+  if (c == '\n') {
+    *x = 0;
+    *y += textsize_y * font->yAdvance();
   }
-#endif
+  if (c == '\r') {
+    // ignored
+  }
+
+  const Glyph *g = font->getGlyph(c);
+  if (!g)
+    return;
+
+  uint8_t gw = g->width();
+  uint8_t gh = g->height();
+  uint8_t xa = g->xAdvance();
+  int8_t xo = g->xOffset();
+  int8_t yo = g->yOffset();
+  if (wrap && ((*x + textsize_x * (xo + gw)) > _width)) {
+    *x = 0;
+    *y += textsize_y * font->yAdvance();
+  }
+  int16_t x1 = *x + textsize_x * xo;
+  int16_t y1 = *y + textsize_y * yo;
+  int16_t x2 = x1 + textsize_x * gw - 1;
+  int16_t y2 = y1 + textsize_y * gh - 1;
+
+  *minx = _min(*minx, x1);
+  *miny = _min(*miny, y1);
+  *maxx = _max(*maxx, x2);
+  *maxy = _max(*maxy, y2);
+  *x += textsize_x * xa;
 }
 
 /**************************************************************************/
