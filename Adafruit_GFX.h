@@ -13,9 +13,44 @@
 /// minimum you can subclass and provide drawPixel(). At a maximum you can do a
 /// ton of overriding to optimize. Used for any/all Adafruit displays!
 class Adafruit_GFX : public Print {
-
 public:
+  class GlyphDraw {
+  public:
+    // set or clear one logical pixel.
+    virtual void setPixel(int16_t x, int16_t y, bool set) const = 0;
+  };
+
+  class Glyph {
+  public:
+    virtual uint8_t width() const = 0;
+    virtual uint8_t height() const = 0;
+    virtual uint8_t xAdvance() const = 0;
+    virtual int8_t xOffset() const = 0;
+    virtual int8_t yOffset() const = 0;
+    // Glyphs just known how to draw in an implied color, at an implied
+    // scale, at an implied origin. The GlyphDraw takes care of all
+    // necessary transformations.
+    virtual void draw(GlyphDraw& ctx) const = 0;
+  };
+
+  class Font {
+  public:
+    virtual ~Font() {}
+    virtual uint8_t yAdvance() const = 0;
+    virtual Glyph* getGlyph(uint16_t ch) const = 0;
+
+    // Only ClassicFont cares about this. See `Adafruit_GFX::cp437`.
+    virtual void useCorrectCodePage437(boolean x) {}
+
+    // The amount added to cursorY when this font is installed,
+    // and removed from cursorY when this font is uninstalled.
+    // Only ClassicFont does anything interesting here.
+    // ClassicFont interprets cursor as topleft corner of glyph.
+    virtual uint8_t topToBaseline() const { return 0; }
+  };
+
   Adafruit_GFX(int16_t w, int16_t h); // Constructor
+  virtual ~Adafruit_GFX();
 
   /**********************************************************************/
   /*!
@@ -164,18 +199,22 @@ public:
   /**********************************************************************/
   /*!
     @brief  Enable (or disable) Code Page 437-compatible charset.
-            There was an error in glcdfont.c for the longest time -- one
-            character (#176, the 'light shade' block) was missing -- this
-            threw off the index of every character that followed it.
-            But a TON of code has been written with the erroneous
-            character indices. By default, the library uses the original
-            'wrong' behavior and old sketches will still work. Pass
-            'true' to this function to use correct CP437 character values
-            in your code.
+
+    There was an error in glcdfont.c for the longest time -- one
+    character (#176, the 'light shade' block) was missing -- this
+    threw off the index of every character that followed it.
+    But a TON of code has been written with the erroneous
+    character indices. By default, the library uses the original
+    'wrong' behavior and old sketches will still work. Pass
+    'true' to this function to use correct CP437 character values
+    in your code.
+
     @param  x  true = enable (new behavior), false = disable (old behavior)
   */
   /**********************************************************************/
-  void cp437(boolean x = true) { _cp437 = x; }
+  void cp437(boolean x = true) {
+    font->useCorrectCodePage437(x);
+  }
 
   using Print::write;
 #if ARDUINO >= 100
@@ -241,8 +280,7 @@ protected:
   uint8_t textsize_y;   ///< Desired magnification in Y-axis of text to print()
   uint8_t rotation;     ///< Display rotation (0 thru 3)
   boolean wrap;         ///< If set, 'wrap' text at right edge of display
-  boolean _cp437;       ///< If set, use correct CP437 charset (default is off)
-  GFXfont *gfxFont;     ///< Pointer to special font
+  Font* font;
 };
 
 /// A simple drawn button UI element
