@@ -1279,9 +1279,6 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
 void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
                             uint16_t color, uint16_t bg, uint8_t size_x,
                             uint8_t size_y) {
-  Serial.printf("dc(%d,%d,'%c',color:[%u,%u],sz:[%u,%u]\n", //
-                x, y, c, color, bg, size_x, size_y);
-
   // Get a glyph.
   // Make a draw context.
   // Tell the glyph to draw itself on the context.
@@ -1296,17 +1293,14 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
         : gfx(gfx), x0(x0), y0(y0), fg(fg), bg(bg), sx(sx), sy(sy) {}
 
     void setPixel(int16_t x, int16_t y, bool set) const override {
-      Serial.printf("  - px(%d,%d,%d)", x, y, set);
       if (!set && fg == bg)
         return; // Drawing a transparent background. Do nothing.
       uint16_t color = set ? fg : bg;
       if (sx == 1 && sy == 1) {
-        Serial.printf(": writePixel(%d,%d,%d)", x0 + x, y0 + y, color);
         gfx->writePixel(x0 + x, y0 + y, color);
       } else {
         gfx->fillRect(x0 + x * sx, y0 + y * sy, sx, sy, color);
       }
-      Serial.printf("\n");
     }
 
     Adafruit_GFX *gfx;
@@ -1330,8 +1324,6 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
 */
 /**************************************************************************/
 size_t Adafruit_GFX::write(uint8_t c) {
-  Serial.printf("{w:'%c':%#02x,sx:%u,cur:[%d,%d]}\n", //
-                c, c, textsize_x, cursor_x, cursor_y);
   if (c == '\n') {
     cursor_x = 0;
     cursor_y += textsize_y * font->yAdvance();
@@ -1350,15 +1342,11 @@ size_t Adafruit_GFX::write(uint8_t c) {
   if (wrap && (cursor_x + textsize_x * (g->xOffset() + g->width())) > _width) {
     cursor_x = 0;
     cursor_y += textsize_y * font->yAdvance();
-    // Serial.printf("wrapped to (%d,%d)\n", cursor_x, cursor_y);
   }
-
-  // Serial.printf("colors(%u, %u)\n", textcolor, textbgcolor);
 
   drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize_x,
            textsize_y);
   cursor_x += textsize_x * g->xAdvance(); // Advance x one char
-  // Serial.printf("Advanced:(%d,%d)\n", cursor_x, cursor_y);
   return 1;
 }
 
