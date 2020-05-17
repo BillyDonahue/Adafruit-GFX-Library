@@ -1,9 +1,6 @@
 // This is the 'classic' fixed-space bitmap font for Adafruit_GFX since 1.0.
 // See gfxfont.h for newer custom bitmap font info.
 
-#ifndef GLCDFONT_H
-#define GLCDFONT_H
-
 #include <stdint.h>
 
 #ifdef __AVR__
@@ -278,5 +275,3 @@ extern const uint8_t font[] PROGMEM = {
     0x00, 0x3C, 0x3C, 0x3C, 0x3C, //
     0x00, 0x00, 0x00, 0x00, 0x00  // #255 NBSP
 };
-
-#endif // GLCDFONT_H
