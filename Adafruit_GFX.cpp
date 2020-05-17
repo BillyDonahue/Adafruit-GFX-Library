@@ -86,23 +86,22 @@ inline uint8_t *pgm_read_bitmap_ptr(const GFXfont *gfxFont) {
 #endif //__AVR__
 }
 
-/// If set, use correct CP437 charset (default is off). It's a global because
-/// being pre-CP437 is program-wide, not per-display. Either the current program
-/// is a CP437 sketch or it's not.
-static boolean _cp437 = false;
+#ifndef min
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+#endif
 
-template <typename T> static const T &min_(const T &a, const T &b) {
-  return a < b ? a : b;
-}
-template <typename T> static const T &max_(const T &a, const T &b) {
-  return a > b ? a : b;
-}
+#ifndef max
+#define max(a, b) (((a) > (b)) ? (a) : (b))
+#endif
 
-static inline void _swap_int16_t(int16_t &a, int16_t &b) {
-  int16_t t = a;
-  a = b;
-  b = t;
-}
+#ifndef _swap_int16_t
+#define _swap_int16_t(a, b)                                                    \
+  {                                                                            \
+    int16_t t = a;                                                             \
+    a = b;                                                                     \
+    b = t;                                                                     \
+  }
+#endif
 
 class ClassicFont : public Adafruit_GFX::AbstractFont {
 public:
@@ -1432,10 +1431,10 @@ void Adafruit_GFX::charBounds(unsigned char c, int16_t *x, int16_t *y, int16_t *
   int16_t x2 = x1 + textsize_x * gw - 1;
   int16_t y2 = y1 + textsize_y * gh - 1;
 
-  *minx = min_(*minx, x1);
-  *miny = min_(*miny, y1);
-  *maxx = max_(*maxx, x2);
-  *maxy = max_(*maxy, y2);
+  *minx = min(*minx, x1);
+  *miny = min(*miny, y1);
+  *maxx = max(*maxx, x2);
+  *maxy = max(*maxy, y2);
   *x += textsize_x * xa;
 }
 
