@@ -16,11 +16,11 @@
 #else
 #define PROGMEM
 #endif
-#include <stdint.h>
 
-// Standard ASCII 6 x 8 font (5x8 bitmaps)
-extern const uint8_t font[] PROGMEM;
-const uint8_t font[] PROGMEM = {
+// Standard ASCII 5x7 font
+
+extern const unsigned char font[] PROGMEM;
+const unsigned char font[] PROGMEM = {
     0x00, 0x00, 0x00, 0x00, 0x00, //
     0x3E, 0x5B, 0x4F, 0x5B, 0x3E, //
     0x3E, 0x6B, 0x4F, 0x6B, 0x3E, //
