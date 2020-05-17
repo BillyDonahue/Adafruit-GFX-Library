@@ -39,12 +39,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <pgmspace.h>
 #endif
 
-/// If set, use correct CP437 charset (default is off). It's a global because
-/// it's a backward compatibility feature to keep old sketches working. The
-/// assumption of a pre-CP437 charset is program-wide, not per-display. Either
-/// the entire program wants CP437 or it doesn't.
-static boolean _cp437 = false;
-
 // Many (but maybe not all) non-AVR board installs define macros
 // for compatibility with existing PROGMEM-reading AVR code.
 // Do our own checks and defines here for good measure...
@@ -139,11 +133,13 @@ public:
     uint8_t ch;
   };
 
+  explicit ClassicFont(const boolean *cp437) : _cp437(cp437) {}
+
   uint8_t yAdvance() const override { return 8; }
   uint8_t yAdjustment() const override { return 6; }
 
   Glyph *getGlyph(uint16_t ch) const override {
-    if (!_cp437 && ch >= 176)
+    if (!*_cp437 && ch >= 176)
       ++ch; // Handle 'classic' charset behavior
     if (ch >= 256)
       return nullptr;
@@ -151,6 +147,7 @@ public:
     return &_active;
   }
 
+  const boolean *_cp437;
   mutable Glyph _active;
 };
 
@@ -231,8 +228,6 @@ public:
   mutable Glyph activeGlyph;
 };
 
-void Adafruit_GFX::cp437(boolean x) { _cp437 = x; }
-
 /**************************************************************************/
 /*!
    @brief    Instatiate a GFX context for graphics! Can only be done by a
@@ -241,10 +236,17 @@ void Adafruit_GFX::cp437(boolean x) { _cp437 = x; }
    @param    h   Display height, in pixels
 */
 /**************************************************************************/
-Adafruit_GFX::Adafruit_GFX(int16_t w, int16_t h)
-    : WIDTH(w), HEIGHT(h), _width(WIDTH), _height(HEIGHT), cursor_x(0),
-      cursor_y(0), textcolor(0xFFFF), textbgcolor(0xFFFF), textsize_x(1),
-      textsize_y(1), rotation(0), wrap(true), font_(new ClassicFont()) {}
+Adafruit_GFX::Adafruit_GFX(int16_t w, int16_t h) : WIDTH(w), HEIGHT(h) {
+  _width = WIDTH;
+  _height = HEIGHT;
+  rotation = 0;
+  cursor_y = cursor_x = 0;
+  textsize_x = textsize_y = 1;
+  textcolor = textbgcolor = 0xFFFF;
+  wrap = true;
+  _cp437 = false;
+  font_ = new ClassicFont(&_cp437);
+}
 
 Adafruit_GFX::~Adafruit_GFX() { delete font_; }
 
@@ -1393,7 +1395,7 @@ void Adafruit_GFX::setFont(const GFXfont *f) {
 void Adafruit_GFX::setAbstractFont(const AbstractFont *f) {
   cursor_y += font_->yAdjustment();
   delete font_;
-  font_ = f ? f : new ClassicFont();
+  font_ = f ? f : new ClassicFont(&_cp437);
   cursor_y -= font_->yAdjustment();
 }
 
