@@ -236,9 +236,12 @@ public:
 
   using Print::write;
 #if ARDUINO >= 100
-  virtual size_t write(uint8_t);
+  size_t write(uint8_t c) override {
+    write_(c);
+    return 1;
+  }
 #else
-  virtual void write(uint8_t);
+  void write(uint8_t c) override { write_(c); }
 #endif
 
   /************************************************************************/
@@ -302,6 +305,9 @@ protected:
   GFXfont *gfxFont;     ///< Pointer to special font
 
 private:
+  void drawGlyph_(int16_t x, int16_t y, const AbstractFont::Glyph *g,
+                  uint16_t color, uint16_t bg, uint8_t size_x, uint8_t size_y);
+  void write_(uint16_t c);
   ClassicFont classicFont_; ///< Default 6x8 font covering the CP437 charset.
   const AbstractFont *font_ = &classicFont_; ///< owned if != &classicFont_
 };

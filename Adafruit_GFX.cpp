@@ -1244,16 +1244,18 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
 void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
                             uint16_t color, uint16_t bg, uint8_t size_x,
                             uint8_t size_y) {
-  // Get a glyph.
-  // Make a draw context.
-  // Tell the glyph to draw itself on the context.
-  AbstractFont::Glyph *glyph = font_->getGlyph(c);
-  if (!glyph)
+  AbstractFont::Glyph *g = font_->getGlyph(c);
+  if (!g)
     return;
+  drawGlyph_(x, y, g, color, bg, size_x, size_y);
+}
 
-  // Takes raw glyph pixel setting commands and applies scaling, coloring, and
-  // coordinate translation.
-  class Draw : public GlyphDrawingContext {
+void Adafruit_GFX::drawGlyph_(int16_t x, int16_t y,
+                              const AbstractFont::Glyph *g, uint16_t color,
+                              uint16_t bg, uint8_t size_x, uint8_t size_y) {
+  // Takes raw glyph pixel painting calls, and applies
+  // coordinate translation, coloring, and scaling.
+  class Draw : public Adafruit_GFX::GlyphDrawingContext {
   public:
     Draw(Adafruit_GFX *gfx, int16_t x0, int16_t y0, uint16_t fg, uint16_t bg,
          uint8_t sx, uint8_t sy)
@@ -1280,7 +1282,7 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
   };
   Draw draw(this, x, y, color, bg, size_x, size_y);
   startWrite();
-  glyph->draw(&draw);
+  g->draw(&draw);
   endWrite();
 }
 
@@ -1290,38 +1292,35 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
     @param  c  The 8-bit ascii character to write
 */
 /**************************************************************************/
-size_t Adafruit_GFX::write(uint8_t c) {
+void Adafruit_GFX::write_(uint16_t c) {
   if (c == '\n') {
     cursor_x = 0;
     cursor_y += textsize_y * font_->yAdvance();
-    return 1;
+    return;
   }
-  if (c == '\r') { // Ignore carriage returns
-    return 1;
-  }
+  if (c == '\r') // Ignore carriage returns
+    return;
 
   AbstractFont::Glyph *g = font_->getGlyph(c);
-  if (!g) {
-    return 1;
-  }
+  if (!g)
+    return;
 
   // Check the rightmost edge of the character against our _width
   if (wrap && (cursor_x + textsize_x * (g->xOffset() + g->width())) > _width) {
     cursor_x = 0;
     cursor_y += textsize_y * font_->yAdvance();
   }
-
-  drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize_x,
-           textsize_y);
+  drawGlyph_(cursor_x, cursor_y, g, textcolor, textbgcolor, textsize_x,
+             textsize_y);
   cursor_x += textsize_x * g->xAdvance(); // Advance x one char
-  return 1;
 }
 
 /**************************************************************************/
 /*!
     @brief   Set text 'magnification' size. Each increase in s makes 1 pixel
    that much bigger.
-    @param  s  Desired text size. 1 is default 6x8, 2 is 12x16, 3 is 18x24, etc
+    @param  s  Desired text size. 1 is default 6x8, 2 is 12x16, 3 is 18x24,
+   etc
 */
 /**************************************************************************/
 void Adafruit_GFX::setTextSize(uint8_t s) { setTextSize(s, s); }
@@ -1330,8 +1329,10 @@ void Adafruit_GFX::setTextSize(uint8_t s) { setTextSize(s, s); }
 /*!
     @brief   Set text 'magnification' size. Each increase in s makes 1 pixel
    that much bigger.
-    @param  s_x  Desired text width magnification level in X-axis. 1 is default
-    @param  s_y  Desired text width magnification level in Y-axis. 1 is default
+    @param  s_x  Desired text width magnification level in X-axis. 1 is
+   default
+    @param  s_y  Desired text width magnification level in Y-axis. 1 is
+   default
 */
 /**************************************************************************/
 void Adafruit_GFX::setTextSize(uint8_t s_x, uint8_t s_y) {
@@ -1432,8 +1433,8 @@ void Adafruit_GFX::charBounds(unsigned char c, int16_t *x, int16_t *y,
 
 /**************************************************************************/
 /*!
-    @brief    Helper to determine size of a string with current font/size. Pass
-   string and a cursor position, returns UL corner and W,H.
+    @brief    Helper to determine size of a string with current font/size.
+   Pass string and a cursor position, returns UL corner and W,H.
     @param    str     The ascii string to measure
     @param    x       The current cursor X
     @param    y       The current cursor Y
@@ -1469,9 +1470,10 @@ void Adafruit_GFX::getTextBounds(const char *str, int16_t x, int16_t y,
 
 /**************************************************************************/
 /*!
-    @brief    Helper to determine size of a string with current font/size. Pass
-   string and a cursor position, returns UL corner and W,H.
-    @param    str    The ascii string to measure (as an arduino String() class)
+    @brief    Helper to determine size of a string with current font/size.
+   Pass string and a cursor position, returns UL corner and W,H.
+    @param    str    The ascii string to measure (as an arduino String()
+   class)
     @param    x      The current cursor X
     @param    y      The current cursor Y
     @param    x1     The boundary X coordinate, set by function
@@ -1689,8 +1691,8 @@ void Adafruit_GFX_Button::drawButton(boolean inverted) {
 
 /**************************************************************************/
 /*!
-    @brief    Helper to let us know if a coordinate is within the bounds of the
-   button
+    @brief    Helper to let us know if a coordinate is within the bounds of
+   the button
     @param    x       The X coordinate to check
     @param    y       The Y coordinate to check
     @returns  True if within button graphics outline
