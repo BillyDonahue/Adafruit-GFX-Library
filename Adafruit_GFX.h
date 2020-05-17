@@ -13,6 +13,7 @@
 /// minimum you can subclass and provide drawPixel(). At a maximum you can do a
 /// ton of overriding to optimize. Used for any/all Adafruit displays!
 class Adafruit_GFX : public Print {
+
 public:
   class GlyphDraw {
   public:
@@ -29,9 +30,6 @@ public:
       virtual uint8_t xAdvance() const = 0;
       virtual int8_t xOffset() const = 0;
       virtual int8_t yOffset() const = 0;
-      // Glyphs just known how to draw in an implied color, at an implied
-      // scale, at an implied origin. The GlyphDraw takes care of all
-      // necessary transformations into the coordinates of the GFX.
       virtual void draw(GlyphDraw *ctx) const = 0;
     };
 
@@ -150,10 +148,7 @@ public:
                      int16_t *y1, uint16_t *w, uint16_t *h);
   void setTextSize(uint8_t s);
   void setTextSize(uint8_t sx, uint8_t sy);
-
   void setFont(const GFXfont *f = NULL);
-
-  /* Takes ownership of abstract font 'f'. */
   void setAbstractFont(const AbstractFont *f);
 
   /**********************************************************************/
@@ -202,16 +197,14 @@ public:
   /**********************************************************************/
   /*!
     @brief  Enable (or disable) Code Page 437-compatible charset.
-
-    There was an error in glcdfont.c for the longest time -- one
-    character (#176, the 'light shade' block) was missing -- this
-    threw off the index of every character that followed it.
-    But a TON of code has been written with the erroneous
-    character indices. By default, the library uses the original
-    'wrong' behavior and old sketches will still work. Pass
-    'true' to this function to use correct CP437 character values
-    in your code.
-
+            There was an error in glcdfont.c for the longest time -- one
+            character (#176, the 'light shade' block) was missing -- this
+            threw off the index of every character that followed it.
+            But a TON of code has been written with the erroneous
+            character indices. By default, the library uses the original
+            'wrong' behavior and old sketches will still work. Pass
+            'true' to this function to use correct CP437 character values
+            in your code.
     @param  x  true = enable (new behavior), false = disable (old behavior)
   */
   /**********************************************************************/
