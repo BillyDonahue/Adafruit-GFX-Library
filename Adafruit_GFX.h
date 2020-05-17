@@ -15,7 +15,7 @@
 class Adafruit_GFX : public Print {
 
 public:
-  class GlyphDraw {
+  class GlyphDrawingContext {
   public:
     // set or clear one logical pixel.
     virtual void setPixel(int16_t x, int16_t y, bool set) const = 0;
@@ -30,7 +30,7 @@ public:
       virtual uint8_t xAdvance() const = 0;
       virtual int8_t xOffset() const = 0;
       virtual int8_t yOffset() const = 0;
-      virtual void draw(GlyphDraw *ctx) const = 0;
+      virtual void draw(GlyphDrawingContext *ctx) const = 0;
     };
 
     virtual ~AbstractFont() = default;
@@ -44,6 +44,37 @@ public:
     // So when it is replaced, the cursor moves down by 6pixels so
     // the baseline of subsequent gfx->print statements will match.
     virtual uint8_t yAdjustment() const { return 0; }
+  };
+
+  class ClassicFont : public AbstractFont {
+  public:
+    class Glyph : public AbstractFont::Glyph {
+    public:
+      static const uint8_t bmp_w = 5;
+      static const uint8_t bmp_h = 8;
+      uint8_t width() const override { return bmp_w; }
+      uint8_t height() const override { return bmp_h; }
+      uint8_t xAdvance() const override { return 6; }
+      int8_t xOffset() const override { return 0; }
+      int8_t yOffset() const override { return 0; }
+      void draw(GlyphDrawingContext *ctx) const override;
+      uint8_t ch;
+    };
+
+    uint8_t yAdvance() const override { return 8; }
+    uint8_t yAdjustment() const override { return 6; }
+
+    Glyph *getGlyph(uint16_t ch) const override {
+      if (!correctCodePage437 && ch >= 176)
+        ++ch; // Handle 'classic' charset behavior
+      if (ch >= 256)
+        return nullptr;
+      activeGlyph.ch = ch;
+      return &activeGlyph;
+    }
+
+    boolean correctCodePage437 = false;
+    mutable Glyph activeGlyph;
   };
 
   Adafruit_GFX(int16_t w, int16_t h); // Constructor
@@ -208,7 +239,7 @@ public:
     @param  x  true = enable (new behavior), false = disable (old behavior)
   */
   /**********************************************************************/
-  void cp437(boolean x = true) { _cp437 = x; }
+  void cp437(boolean x = true) { classicFont_.correctCodePage437 = x; }
 
   using Print::write;
 #if ARDUINO >= 100
@@ -260,8 +291,8 @@ public:
   int16_t getCursorY(void) const { return cursor_y; };
 
 protected:
-  void charBounds(unsigned char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny,
-                  int16_t *maxx, int16_t *maxy);
+  void charBounds(unsigned char c, int16_t *x, int16_t *y, int16_t *minx,
+                  int16_t *miny, int16_t *maxx, int16_t *maxy);
   int16_t WIDTH;        ///< This is the 'raw' display width - never changes
   int16_t HEIGHT;       ///< This is the 'raw' display height - never changes
   int16_t _width;       ///< Display width as modified by current rotation
@@ -278,7 +309,8 @@ protected:
   GFXfont *gfxFont;     ///< Pointer to special font
 
 private:
-  const AbstractFont *font_; // owned
+  ClassicFont classicFont_; ///< Default 6x8 font covering the CP437 charset.
+  const AbstractFont *font_ = &classicFont_; ///< owned if != &classicFont_
 };
 
 /// A simple drawn button UI element

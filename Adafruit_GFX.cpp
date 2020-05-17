@@ -103,53 +103,20 @@ inline uint8_t *pgm_read_bitmap_ptr(const GFXfont *gfxFont) {
   }
 #endif
 
-class ClassicFont : public Adafruit_GFX::AbstractFont {
-public:
-  class Glyph : public Adafruit_GFX::AbstractFont::Glyph {
-    static const uint8_t bmp_w = 5;
-    static const uint8_t bmp_h = 8;
+void Adafruit_GFX::ClassicFont::Glyph::draw(GlyphDrawingContext *ctx) const {
+  // Clip right, left, bottom, top
+  // TODO: expose bounds from the GlyphDrawingContext?
+  // if (x >= gfx->_width || (x + gw * size_x) <= 0 ||
+  //    y >= gfx->_height || (y + gh * size_y) <= 0)
+  //  return;
 
-  public:
-    uint8_t width() const override { return bmp_w; }
-    uint8_t height() const override { return bmp_h; }
-    uint8_t xAdvance() const override { return 6; }
-    int8_t xOffset() const override { return 0; }
-    int8_t yOffset() const override { return 0; }
-
-    void draw(Adafruit_GFX::GlyphDraw *ctx) const override {
-      // Clip right, left, bottom, top
-      // TODO: expose bounds from the GlyphDraw?
-      // if (x >= gfx->_width || (x + gw * size_x) <= 0 ||
-      //    y >= gfx->_height || (y + gh * size_y) <= 0)
-      //  return;
-
-      for (int8_t i = 0; i < bmp_w; ++i) {
-        uint8_t vline =
-            i < xAdvance() ? (uint8_t)pgm_read_byte(&font[ch * bmp_w + i]) : 0;
-        for (int8_t j = 0; j < bmp_h; ++j, vline >>= 1)
-          ctx->setPixel(i, j, vline & 1);
-      }
-    }
-    uint8_t ch;
-  };
-
-  explicit ClassicFont(const boolean *cp437) : _cp437(cp437) {}
-
-  uint8_t yAdvance() const override { return 8; }
-  uint8_t yAdjustment() const override { return 6; }
-
-  Glyph *getGlyph(uint16_t ch) const override {
-    if (!*_cp437 && ch >= 176)
-      ++ch; // Handle 'classic' charset behavior
-    if (ch >= 256)
-      return nullptr;
-    _active.ch = ch;
-    return &_active;
+  for (int8_t i = 0; i < bmp_w; ++i) {
+    uint8_t vline =
+        i < xAdvance() ? (uint8_t)pgm_read_byte(&font[ch * bmp_w + i]) : 0;
+    for (int8_t j = 0; j < bmp_h; ++j, vline >>= 1)
+      ctx->setPixel(i, j, vline & 1);
   }
-
-  const boolean *_cp437;
-  mutable Glyph _active;
-};
+}
 
 class GFXfontAdapter : public Adafruit_GFX::AbstractFont {
 public:
@@ -163,7 +130,7 @@ public:
     int8_t xOffset() const override { return pgm_read_byte(&glyph->xOffset); }
     int8_t yOffset() const override { return pgm_read_byte(&glyph->yOffset); }
 
-    void draw(Adafruit_GFX::GlyphDraw *ctx) const override {
+    void draw(Adafruit_GFX::GlyphDrawingContext *ctx) const override {
       uint16_t bo = 0;
       uint8_t w = pgm_read_byte(&glyph->width);
       uint8_t h = pgm_read_byte(&glyph->height);
@@ -244,11 +211,13 @@ Adafruit_GFX::Adafruit_GFX(int16_t w, int16_t h) : WIDTH(w), HEIGHT(h) {
   textsize_x = textsize_y = 1;
   textcolor = textbgcolor = 0xFFFF;
   wrap = true;
-  _cp437 = false;
-  font_ = new ClassicFont(&_cp437);
 }
 
-Adafruit_GFX::~Adafruit_GFX() { delete font_; }
+Adafruit_GFX::~Adafruit_GFX() {
+  if (font_ != &classicFont_) {
+    delete font_;
+  }
+}
 
 /**************************************************************************/
 /*!
@@ -1274,7 +1243,7 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
 
   // Takes raw glyph pixel setting commands and applies scaling, coloring, and
   // coordinate translation.
-  class Draw : public GlyphDraw {
+  class Draw : public GlyphDrawingContext {
   public:
     Draw(Adafruit_GFX *gfx, int16_t x0, int16_t y0, uint16_t fg, uint16_t bg,
          uint8_t sx, uint8_t sy)
@@ -1394,8 +1363,10 @@ void Adafruit_GFX::setFont(const GFXfont *f) {
 
 void Adafruit_GFX::setAbstractFont(const AbstractFont *f) {
   cursor_y += font_->yAdjustment();
-  delete font_;
-  font_ = f ? f : new ClassicFont(&_cp437);
+  if (font_ != &classicFont_) {
+    delete font_;
+  }
+  font_ = f ? f : &classicFont_;
   cursor_y -= font_->yAdjustment();
 }
 
@@ -1413,8 +1384,9 @@ void Adafruit_GFX::setAbstractFont(const AbstractFont *f) {
     @param    maxy  Maximum clipping value for Y
 */
 /**************************************************************************/
-void Adafruit_GFX::charBounds(unsigned char c, int16_t *x, int16_t *y, int16_t *minx,
-                              int16_t *miny, int16_t *maxx, int16_t *maxy) {
+void Adafruit_GFX::charBounds(unsigned char c, int16_t *x, int16_t *y,
+                              int16_t *minx, int16_t *miny, int16_t *maxx,
+                              int16_t *maxy) {
   if (c == '\n') {
     *x = 0;
     *y += textsize_y * font_->yAdvance();
