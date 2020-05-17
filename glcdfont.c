@@ -19,9 +19,8 @@
 #define PROGMEM
 #endif
 
-// Standard ASCII (5+1) x 8 font
-extern const uint8_t font[] PROGMEM;
-const uint8_t font[] PROGMEM = {
+// Standard ASCII 6 x 8 font (5x8 bitmaps)
+extern const uint8_t font[] PROGMEM = {
     0x00, 0x00, 0x00, 0x00, 0x00, //
     0x3E, 0x5B, 0x4F, 0x5B, 0x3E, //
     0x3E, 0x6B, 0x4F, 0x6B, 0x3E, //
