@@ -86,10 +86,15 @@ inline uint8_t *pgm_read_bitmap_ptr(const GFXfont *gfxFont) {
 #endif //__AVR__
 }
 
-template <typename T> static inline const T &_min(const T &a, const T &b) {
+/// If set, use correct CP437 charset (default is off). It's a global because
+/// being pre-CP437 is program-wide, not per-display. Either the current program
+/// is a CP437 sketch or it's not.
+static boolean _cp437 = false;
+
+template <typename T> static const T &min_(const T &a, const T &b) {
   return a < b ? a : b;
 }
-template <typename T> static inline const T &_max(const T &a, const T &b) {
+template <typename T> static const T &max_(const T &a, const T &b) {
   return a > b ? a : b;
 }
 
@@ -99,41 +104,40 @@ static inline void _swap_int16_t(int16_t &a, int16_t &b) {
   b = t;
 }
 
-class ClassicFont : public Adafruit_GFX::Font {
+class ClassicFont : public Adafruit_GFX::AbstractFont {
 public:
-  class Glyph : public Adafruit_GFX::Glyph {
+  class Glyph : public Adafruit_GFX::AbstractFont::Glyph {
+    static const uint8_t bmp_w = 5;
+    static const uint8_t bmp_h = 8;
+
   public:
-    uint8_t width() const override { return 5; }
-    uint8_t height() const override { return 8; }
+    uint8_t width() const override { return bmp_w; }
+    uint8_t height() const override { return bmp_h; }
     uint8_t xAdvance() const override { return 6; }
     int8_t xOffset() const override { return 0; }
     int8_t yOffset() const override { return 0; }
 
-    void draw(Adafruit_GFX::GlyphDraw &ctx) const override {
+    void draw(Adafruit_GFX::GlyphDraw *ctx) const override {
       // Clip right, left, bottom, top
       // TODO: expose bounds from the GlyphDraw?
       // if (x >= gfx->_width || (x + gw * size_x) <= 0 ||
       //    y >= gfx->_height || (y + gh * size_y) <= 0)
       //  return;
 
-      static const uint8_t b_w = 5;
-      static const uint8_t b_h = 8;
-
-      for (int8_t i = 0; i < b_w; ++i) {
+      for (int8_t i = 0; i < bmp_w; ++i) {
         uint8_t vline =
-            i < xAdvance() ? (uint8_t)pgm_read_byte(&font[ch * b_w + i]) : 0;
-        for (int8_t j = 0; j < b_h; ++j, vline >>= 1)
-          ctx.setPixel(i, j, vline & 1);
+            i < xAdvance() ? (uint8_t)pgm_read_byte(&font[ch * bmp_w + i]) : 0;
+        for (int8_t j = 0; j < bmp_h; ++j, vline >>= 1)
+          ctx->setPixel(i, j, vline & 1);
       }
     }
     uint8_t ch;
   };
 
-  void useCorrectCodePage437(boolean x) override { _cp437 = x; }
   uint8_t yAdvance() const override { return 8; }
   uint8_t topToBaseline() const override { return 6; }
 
-  Adafruit_GFX::Glyph *getGlyph(uint16_t ch) const override {
+  Glyph *getGlyph(uint16_t ch) const override {
     if (!_cp437 && ch >= 176)
       ++ch; // Handle 'classic' charset behavior
     if (ch >= 256)
@@ -142,105 +146,87 @@ public:
     return &_active;
   }
 
-  bool _cp437 = false; ///< If set, use correct CP437 charset (default is off)
   mutable Glyph _active;
 };
 
-class CustomFont : public Adafruit_GFX::Font {
-  class Glyph : public Adafruit_GFX::Glyph {
+class GFXfontAdapter : public Adafruit_GFX::AbstractFont {
+public:
+  class Glyph : public Adafruit_GFX::AbstractFont::Glyph {
   public:
-    uint8_t width() const override;
-    uint8_t height() const override;
-    uint8_t xAdvance() const override;
-    int8_t xOffset() const override;
-    int8_t yOffset() const override;
-    void draw(Adafruit_GFX::GlyphDraw &ctx) const override;
+    uint8_t width() const override { return pgm_read_byte(&glyph->width); }
+    uint8_t height() const override { return pgm_read_byte(&glyph->height); }
+    uint8_t xAdvance() const override {
+      return pgm_read_byte(&glyph->xAdvance);
+    }
+    int8_t xOffset() const override { return pgm_read_byte(&glyph->xOffset); }
+    int8_t yOffset() const override { return pgm_read_byte(&glyph->yOffset); }
+
+    void draw(Adafruit_GFX::GlyphDraw *ctx) const override {
+      uint16_t bo = 0;
+      uint8_t w = pgm_read_byte(&glyph->width);
+      uint8_t h = pgm_read_byte(&glyph->height);
+      int16_t xo = (int8_t)pgm_read_byte(&glyph->xOffset);
+      int16_t yo = (int8_t)pgm_read_byte(&glyph->yOffset);
+      uint8_t bits = 0;
+      uint8_t bit = 0;
+
+      // Todo: Add character clipping here
+
+      // NOTE: THERE IS NO 'BACKGROUND' COLOR OPTION ON CUSTOM FONTS.
+      // THIS IS ON PURPOSE AND BY DESIGN.  The background color feature
+      // has typically been used with the 'classic' font to overwrite old
+      // screen contents with new data.  This ONLY works because the
+      // characters are a uniform size; it's not a sensible thing to do with
+      // proportionally-spaced fonts with glyphs of varying sizes (and that
+      // may overlap).  To replace previously-drawn text when using a custom
+      // font, use the getTextBounds() function to determine the smallest
+      // rectangle encompassing a string, erase the area with fillRect(),
+      // then draw new text.  This WILL infortunately 'blink' the text, but
+      // is unavoidable.  Drawing 'background' pixels will NOT fix this,
+      // only creates a new set of problems.  Have an idea to work around
+      // this (a canvas object type for MCUs that can afford the RAM and
+      // displays supporting setAddrWindow() and pushColors()), but haven't
+      // implemented this yet.
+
+      for (int16_t yg = 0; yg < h; ++yg) {
+        for (int16_t xg = 0; xg < w; ++xg) {
+          if (!(bit++ & 7))
+            bits = pgm_read_byte(&bitmap[bo++]);
+          if (bits & 0x80) {
+            ctx->setPixel(xo + xg, yo + yg, true);
+          }
+          bits <<= 1;
+        }
+      }
+    }
 
     GFXglyph *glyph;
     uint8_t *bitmap;
   };
 
-public:
-  explicit CustomFont(const GFXfont *f) : gfxFont(f) {}
+  explicit GFXfontAdapter(const GFXfont *f) : gfxFont(f) {}
 
   uint8_t yAdvance() const override {
     return pgm_read_byte(&gfxFont->yAdvance);
   }
 
-  Adafruit_GFX::Glyph *getGlyph(uint16_t ch) const override;
+  Glyph *getGlyph(uint16_t ch) const override {
+    uint16_t first = pgm_read_word(&gfxFont->first);
+    uint16_t last = pgm_read_word(&gfxFont->last);
+    if (ch < first || ch > last)
+      return nullptr;
+    activeGlyph.glyph = pgm_read_glyph_ptr(gfxFont, ch - first);
+    uint8_t *bitmap = pgm_read_bitmap_ptr(gfxFont);
+    uint16_t bo = pgm_read_word(&activeGlyph.glyph->bitmapOffset);
+    activeGlyph.bitmap = bitmap + bo;
+    return &activeGlyph;
+  }
 
   const GFXfont *gfxFont;
   mutable Glyph activeGlyph;
 };
 
-Adafruit_GFX::Glyph *CustomFont::getGlyph(uint16_t ch) const {
-  uint16_t first = pgm_read_word(&gfxFont->first);
-  uint16_t last = pgm_read_word(&gfxFont->last);
-  if (ch < first || ch > last)
-    return nullptr;
-  activeGlyph.glyph = pgm_read_glyph_ptr(gfxFont, ch - first);
-
-  uint8_t *bitmap = pgm_read_bitmap_ptr(gfxFont);
-  uint16_t bo = pgm_read_word(&activeGlyph.glyph->bitmapOffset);
-  activeGlyph.bitmap = bitmap + bo;
-
-  return &activeGlyph;
-}
-
-uint8_t CustomFont::Glyph::width() const {
-  return pgm_read_byte(&glyph->width);
-}
-uint8_t CustomFont::Glyph::height() const {
-  return pgm_read_byte(&glyph->height);
-}
-uint8_t CustomFont::Glyph::xAdvance() const {
-  return pgm_read_byte(&glyph->xAdvance);
-}
-int8_t CustomFont::Glyph::xOffset() const {
-  return pgm_read_byte(&glyph->xOffset);
-}
-int8_t CustomFont::Glyph::yOffset() const {
-  return pgm_read_byte(&glyph->yOffset);
-}
-
-void CustomFont::Glyph::draw(Adafruit_GFX::GlyphDraw &ctx) const {
-  uint16_t bo = 0;
-  uint8_t w = pgm_read_byte(&glyph->width);
-  uint8_t h = pgm_read_byte(&glyph->height);
-  int16_t xo = (int8_t)pgm_read_byte(&glyph->xOffset);
-  int16_t yo = (int8_t)pgm_read_byte(&glyph->yOffset);
-  uint8_t bits = 0;
-  uint8_t bit = 0;
-
-  // Todo: Add character clipping here
-
-  // NOTE: THERE IS NO 'BACKGROUND' COLOR OPTION ON CUSTOM FONTS.
-  // THIS IS ON PURPOSE AND BY DESIGN.  The background color feature
-  // has typically been used with the 'classic' font to overwrite old
-  // screen contents with new data.  This ONLY works because the
-  // characters are a uniform size; it's not a sensible thing to do with
-  // proportionally-spaced fonts with glyphs of varying sizes (and that
-  // may overlap).  To replace previously-drawn text when using a custom
-  // font, use the getTextBounds() function to determine the smallest
-  // rectangle encompassing a string, erase the area with fillRect(),
-  // then draw new text.  This WILL infortunately 'blink' the text, but
-  // is unavoidable.  Drawing 'background' pixels will NOT fix this,
-  // only creates a new set of problems.  Have an idea to work around
-  // this (a canvas object type for MCUs that can afford the RAM and
-  // displays supporting setAddrWindow() and pushColors()), but haven't
-  // implemented this yet.
-
-  for (int16_t yg = 0; yg < h; ++yg) {
-    for (int16_t xg = 0; xg < w; ++xg) {
-      if (!(bit++ & 7))
-        bits = pgm_read_byte(&bitmap[bo++]);
-      if (bits & 0x80) {
-        ctx.setPixel(xo + xg, yo + yg, true);
-      }
-      bits <<= 1;
-    }
-  }
-}
+void Adafruit_GFX::cp437(boolean x) { _cp437 = x; }
 
 /**************************************************************************/
 /*!
@@ -258,11 +244,10 @@ Adafruit_GFX::Adafruit_GFX(int16_t w, int16_t h) : WIDTH(w), HEIGHT(h) {
   textsize_x = textsize_y = 1;
   textcolor = textbgcolor = 0xFFFF;
   wrap = true;
-  font = new ClassicFont;
-  font->useCorrectCodePage437(false);
+  font_ = new ClassicFont;
 }
 
-Adafruit_GFX::~Adafruit_GFX() { delete font; }
+Adafruit_GFX::~Adafruit_GFX() { delete font_; }
 
 /**************************************************************************/
 /*!
@@ -1282,14 +1267,14 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
   // Get a glyph.
   // Make a draw context.
   // Tell the glyph to draw itself on the context.
-  Glyph *glyph = font->getGlyph(c);
+  AbstractFont::Glyph *glyph = font_->getGlyph(c);
   if (!glyph)
     return;
 
-  class Ctx : public GlyphDraw {
+  class Draw : public GlyphDraw {
   public:
-    Ctx(Adafruit_GFX *gfx, int16_t x0, int16_t y0, uint16_t fg, uint16_t bg,
-        uint8_t sx, uint8_t sy)
+    Draw(Adafruit_GFX *gfx, int16_t x0, int16_t y0, uint16_t fg, uint16_t bg,
+         uint8_t sx, uint8_t sy)
         : gfx(gfx), x0(x0), y0(y0), fg(fg), bg(bg), sx(sx), sy(sy) {}
 
     void setPixel(int16_t x, int16_t y, bool set) const override {
@@ -1311,9 +1296,9 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
     uint8_t sx;
     uint8_t sy;
   };
-  Ctx ctx(this, x, y, color, bg, size_x, size_y);
+  Draw draw(this, x, y, color, bg, size_x, size_y);
   startWrite();
-  glyph->draw(ctx);
+  glyph->draw(draw);
   endWrite();
 }
 
@@ -1326,14 +1311,14 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
 size_t Adafruit_GFX::write(uint8_t c) {
   if (c == '\n') {
     cursor_x = 0;
-    cursor_y += textsize_y * font->yAdvance();
+    cursor_y += textsize_y * font_->yAdvance();
     return 1;
   }
   if (c == '\r') { // Ignore carriage returns
     return 1;
   }
 
-  Glyph *g = font->getGlyph(c);
+  AbstractFont::Glyph *g = font_->getGlyph(c);
   if (!g) {
     return 1;
   }
@@ -1341,7 +1326,7 @@ size_t Adafruit_GFX::write(uint8_t c) {
   // Check the rightmost edge of the character against our _width
   if (wrap && (cursor_x + textsize_x * (g->xOffset() + g->width())) > _width) {
     cursor_x = 0;
-    cursor_y += textsize_y * font->yAdvance();
+    cursor_y += textsize_y * font_->yAdvance();
   }
 
   drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize_x,
@@ -1401,13 +1386,14 @@ void Adafruit_GFX::setRotation(uint8_t x) {
 */
 /**************************************************************************/
 void Adafruit_GFX::setFont(const GFXfont *f) {
-  cursor_y += font->topToBaseline();
-  delete font;
-  if (f)
-    font = new CustomFont(f);
-  else
-    font = new ClassicFont();
-  cursor_y -= font->topToBaseline();
+  setAbstractFont(f ? new GFXfontAdapter(f) : nullptr);
+}
+
+void Adafruit_GFX::setAbstractFont(const AbstractFont *f) {
+  cursor_y += font_->topToBaseline();
+  delete font_;
+  font_ = f ? f : new ClassicFont();
+  cursor_y -= font_->topToBaseline();
 }
 
 /**************************************************************************/
@@ -1428,13 +1414,13 @@ void Adafruit_GFX::charBounds(unsigned char c, int16_t *x, int16_t *y, int16_t *
                               int16_t *miny, int16_t *maxx, int16_t *maxy) {
   if (c == '\n') {
     *x = 0;
-    *y += textsize_y * font->yAdvance();
+    *y += textsize_y * font_->yAdvance();
   }
   if (c == '\r') {
     // ignored
   }
 
-  const Glyph *g = font->getGlyph(c);
+  const AbstractFont::Glyph *g = font_->getGlyph(c);
   if (!g)
     return;
 
@@ -1445,17 +1431,17 @@ void Adafruit_GFX::charBounds(unsigned char c, int16_t *x, int16_t *y, int16_t *
   int8_t yo = g->yOffset();
   if (wrap && ((*x + textsize_x * (xo + gw)) > _width)) {
     *x = 0;
-    *y += textsize_y * font->yAdvance();
+    *y += textsize_y * font_->yAdvance();
   }
   int16_t x1 = *x + textsize_x * xo;
   int16_t y1 = *y + textsize_y * yo;
   int16_t x2 = x1 + textsize_x * gw - 1;
   int16_t y2 = y1 + textsize_y * gh - 1;
 
-  *minx = _min(*minx, x1);
-  *miny = _min(*miny, y1);
-  *maxx = _max(*maxx, x2);
-  *maxy = _max(*maxy, y2);
+  *minx = min_(*minx, x1);
+  *miny = min_(*miny, y1);
+  *maxx = max_(*maxx, x2);
+  *maxy = max_(*maxy, y2);
   *x += textsize_x * xa;
 }
 
@@ -1705,7 +1691,7 @@ void Adafruit_GFX_Button::drawButton(boolean inverted) {
     text = _fillcolor;
   }
 
-  uint8_t r = _min(_w, _h) / 4; // Corner radius
+  uint8_t r = min_(_w, _h) / 4; // Corner radius
   _gfx->fillRoundRect(_x1, _y1, _w, _h, r, fill);
   _gfx->drawRoundRect(_x1, _y1, _w, _h, r, outline);
 

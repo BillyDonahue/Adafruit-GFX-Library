@@ -20,27 +20,24 @@ public:
     virtual void setPixel(int16_t x, int16_t y, bool set) const = 0;
   };
 
-  class Glyph {
+  class AbstractFont {
   public:
-    virtual uint8_t width() const = 0;
-    virtual uint8_t height() const = 0;
-    virtual uint8_t xAdvance() const = 0;
-    virtual int8_t xOffset() const = 0;
-    virtual int8_t yOffset() const = 0;
-    // Glyphs just known how to draw in an implied color, at an implied
-    // scale, at an implied origin. The GlyphDraw takes care of all
-    // necessary transformations.
-    virtual void draw(GlyphDraw& ctx) const = 0;
-  };
+    class Glyph {
+    public:
+      virtual uint8_t width() const = 0;
+      virtual uint8_t height() const = 0;
+      virtual uint8_t xAdvance() const = 0;
+      virtual int8_t xOffset() const = 0;
+      virtual int8_t yOffset() const = 0;
+      // Glyphs just known how to draw in an implied color, at an implied
+      // scale, at an implied origin. The GlyphDraw takes care of all
+      // necessary transformations into the coordinates of the GFX.
+      virtual void draw(GlyphDraw *ctx) const = 0;
+    };
 
-  class Font {
-  public:
-    virtual ~Font() {}
+    virtual ~AbstractFont() = default;
     virtual uint8_t yAdvance() const = 0;
-    virtual Glyph* getGlyph(uint16_t ch) const = 0;
-
-    // Only ClassicFont cares about this. See `Adafruit_GFX::cp437`.
-    virtual void useCorrectCodePage437(boolean x) {}
+    virtual Glyph *getGlyph(uint16_t ch) const = 0;
 
     // The amount added to cursorY when this font is installed,
     // and removed from cursorY when this font is uninstalled.
@@ -151,7 +148,11 @@ public:
                      int16_t *y1, uint16_t *w, uint16_t *h);
   void setTextSize(uint8_t s);
   void setTextSize(uint8_t sx, uint8_t sy);
+
   void setFont(const GFXfont *f = NULL);
+
+  /* Takes ownership of abstract font 'f'. */
+  void setAbstractFont(const AbstractFont *f);
 
   /**********************************************************************/
   /*!
@@ -212,9 +213,7 @@ public:
     @param  x  true = enable (new behavior), false = disable (old behavior)
   */
   /**********************************************************************/
-  void cp437(boolean x = true) {
-    font->useCorrectCodePage437(x);
-  }
+  static void cp437(boolean x = true);
 
   using Print::write;
 #if ARDUINO >= 100
@@ -280,7 +279,9 @@ protected:
   uint8_t textsize_y;   ///< Desired magnification in Y-axis of text to print()
   uint8_t rotation;     ///< Display rotation (0 thru 3)
   boolean wrap;         ///< If set, 'wrap' text at right edge of display
-  Font* font;
+
+private:
+  const AbstractFont *font_; // owned
 };
 
 /// A simple drawn button UI element
