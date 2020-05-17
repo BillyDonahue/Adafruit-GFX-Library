@@ -1,7 +1,8 @@
 // This is the 'classic' fixed-space bitmap font for Adafruit_GFX since 1.0.
 // See gfxfont.h for newer custom bitmap font info.
 
-#include <stdint.h>
+#ifndef FONT5X7_H
+#define FONT5X7_H
 
 #ifdef __AVR__
 #include <avr/io.h>
@@ -15,9 +16,11 @@
 #else
 #define PROGMEM
 #endif
+#include <stdint.h>
 
 // Standard ASCII 6 x 8 font (5x8 bitmaps)
-extern const uint8_t font[] PROGMEM = {
+extern const uint8_t font[] PROGMEM;
+const uint8_t font[] PROGMEM = {
     0x00, 0x00, 0x00, 0x00, 0x00, //
     0x3E, 0x5B, 0x4F, 0x5B, 0x3E, //
     0x3E, 0x6B, 0x4F, 0x6B, 0x3E, //
@@ -275,3 +278,5 @@ extern const uint8_t font[] PROGMEM = {
     0x00, 0x3C, 0x3C, 0x3C, 0x3C, //
     0x00, 0x00, 0x00, 0x00, 0x00  // #255 NBSP
 };
+
+#endif // FONT5X7_H
