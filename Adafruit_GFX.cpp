@@ -39,6 +39,12 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <pgmspace.h>
 #endif
 
+/// If set, use correct CP437 charset (default is off). It's a global because
+/// it's a backward compatibility feature to keep old sketches working. The
+/// assumption of a pre-CP437 charset is program-wide, not per-display. Either
+/// the entire program wants CP437 or it doesn't.
+static boolean _cp437 = false;
+
 // Many (but maybe not all) non-AVR board installs define macros
 // for compatibility with existing PROGMEM-reading AVR code.
 // Do our own checks and defines here for good measure...
