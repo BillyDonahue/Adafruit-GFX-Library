@@ -24,14 +24,6 @@ typedef struct {
   uint16_t first;   ///< ASCII extents (first char)
   uint16_t last;    ///< ASCII extents (last char)
   uint8_t yAdvance; ///< Newline distance (y axis)
-
-  // Used to convert unicode outside the [first,last] range to a glyph index.
-  // Must be sorted.
-  struct UnicodeGlyphMapping {
-    uint16_t unicode;
-    uint16_t glyph;
-  };
-  UnicodeGlyphMapping *glyphMap = NULL;
 } GFXfont;
 
 #endif // _GFXFONT_H_
