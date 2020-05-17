@@ -43,7 +43,7 @@ public:
     // ClassicFont interprets cursor as topleft corner of glyph.
     // So when it is replaced, the cursor moves down by 6pixels so
     // the baseline of subsequent gfx->print statements will match.
-    virtual uint8_t yAdjustment() const { return 0; }
+    virtual uint8_t cursorYAdjustment() const { return 0; }
   };
 
   class ClassicFont : public AbstractFont {
@@ -62,7 +62,7 @@ public:
     };
 
     uint8_t yAdvance() const override { return 8; }
-    uint8_t yAdjustment() const override { return 6; }
+    uint8_t cursorYAdjustment() const override { return 6; }
 
     Glyph *getGlyph(uint16_t ch) const override {
       if (!correctCodePage437 && ch >= 176)

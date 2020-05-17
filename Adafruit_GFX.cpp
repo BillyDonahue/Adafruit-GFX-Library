@@ -1362,12 +1362,12 @@ void Adafruit_GFX::setFont(const GFXfont *f) {
 }
 
 void Adafruit_GFX::setAbstractFont(const AbstractFont *f) {
-  cursor_y += font_->yAdjustment();
+  cursor_y += font_->cursorYAdjustment();
   if (font_ != &classicFont_) {
     delete font_;
   }
   font_ = f ? f : &classicFont_;
-  cursor_y -= font_->yAdjustment();
+  cursor_y -= font_->cursorYAdjustment();
 }
 
 /**************************************************************************/
