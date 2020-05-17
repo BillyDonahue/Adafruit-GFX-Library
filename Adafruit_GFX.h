@@ -262,20 +262,19 @@ public:
 protected:
   void charBounds(unsigned char c, int16_t *x, int16_t *y, int16_t *minx, int16_t *miny,
                   int16_t *maxx, int16_t *maxy);
-  int16_t WIDTH;            ///< 'raw' display width - never changes
-  int16_t HEIGHT;           ///< 'raw' display height - never changes
-  int16_t _width = WIDTH;   ///< Display width as modified by current rotation
-  int16_t _height = HEIGHT; ///< Display height as modified by current rotation
-
-  int16_t cursor_x = 0;          ///< x location to start print()ing text
-  int16_t cursor_y = 0;          ///< y location to start print()ing text
-  uint16_t textcolor = 0xFFFF;   ///< 16-bit background color for print()
-  uint16_t textbgcolor = 0xFFFF; ///< 16-bit text color for print()
-  uint8_t textsize_x = 1;        ///< horizontal text scaling for print()
-  uint8_t textsize_y = 1;        ///< vertical text scaling for print()
-
-  uint8_t rotation = 0; ///< Display rotation (0 thru 3)
-  boolean wrap = true;  ///< Wrap text at right edge of display?
+  int16_t WIDTH;        ///< This is the 'raw' display width - never changes
+  int16_t HEIGHT;       ///< This is the 'raw' display height - never changes
+  int16_t _width;       ///< Display width as modified by current rotation
+  int16_t _height;      ///< Display height as modified by current rotation
+  int16_t cursor_x;     ///< x location to start print()ing text
+  int16_t cursor_y;     ///< y location to start print()ing text
+  uint16_t textcolor;   ///< 16-bit background color for print()
+  uint16_t textbgcolor; ///< 16-bit text color for print()
+  uint8_t textsize_x;   ///< Desired magnification in X-axis of text to print()
+  uint8_t textsize_y;   ///< Desired magnification in Y-axis of text to print()
+  uint8_t rotation;     ///< Display rotation (0 thru 3)
+  boolean wrap;         ///< If set, 'wrap' text at right edge of display
+  GFXfont *gfxFont;     ///< Pointer to special font
 
 private:
   const AbstractFont *font_; // owned

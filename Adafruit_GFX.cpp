@@ -242,7 +242,9 @@ void Adafruit_GFX::cp437(boolean x) { _cp437 = x; }
 */
 /**************************************************************************/
 Adafruit_GFX::Adafruit_GFX(int16_t w, int16_t h)
-    : WIDTH(w), HEIGHT(h), font_(new ClassicFont()) {}
+    : WIDTH(w), HEIGHT(h), _width(WIDTH), _height(HEIGHT), cursor_x(0),
+      cursor_y(0), textcolor(0xFFFF), textbgcolor(0xFFFF), textsize_x(1),
+      textsize_y(1), rotation(0), wrap(true), font_(new ClassicFont()) {}
 
 Adafruit_GFX::~Adafruit_GFX() { delete font_; }
 
