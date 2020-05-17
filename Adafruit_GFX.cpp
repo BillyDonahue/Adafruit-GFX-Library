@@ -157,8 +157,7 @@ class CustomFont : public Adafruit_GFX::Font {
     void draw(Adafruit_GFX::GlyphDraw &ctx) const override;
 
     GFXglyph *glyph;
-    uint8_t
-        *bitmap; // Start of this glyph's bitmap, not the whole font's bitmaps.
+    uint8_t *bitmap;
   };
 
 public:
@@ -175,8 +174,8 @@ public:
 };
 
 Adafruit_GFX::Glyph *CustomFont::getGlyph(uint16_t ch) const {
-  uint16_t first = pgm_read_byte(&gfxFont->first);
-  uint16_t last = pgm_read_byte(&gfxFont->last);
+  uint16_t first = pgm_read_word(&gfxFont->first);
+  uint16_t last = pgm_read_word(&gfxFont->last);
   if (ch < first || ch > last)
     return nullptr;
   activeGlyph.glyph = pgm_read_glyph_ptr(gfxFont, ch - first);
@@ -208,8 +207,8 @@ void CustomFont::Glyph::draw(Adafruit_GFX::GlyphDraw &ctx) const {
   uint16_t bo = 0;
   uint8_t w = pgm_read_byte(&glyph->width);
   uint8_t h = pgm_read_byte(&glyph->height);
-  int16_t xo = pgm_read_byte(&glyph->xOffset);
-  int16_t yo = pgm_read_byte(&glyph->yOffset);
+  int16_t xo = (int8_t)pgm_read_byte(&glyph->xOffset);
+  int16_t yo = (int8_t)pgm_read_byte(&glyph->yOffset);
   uint8_t bits = 0;
   uint8_t bit = 0;
 
@@ -1280,6 +1279,9 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
 void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
                             uint16_t color, uint16_t bg, uint8_t size_x,
                             uint8_t size_y) {
+  Serial.printf("dc(%d,%d,'%c',color:[%u,%u],sz:[%u,%u]\n", //
+                x, y, c, color, bg, size_x, size_y);
+
   // Get a glyph.
   // Make a draw context.
   // Tell the glyph to draw itself on the context.
@@ -1289,30 +1291,27 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
 
   class Ctx : public GlyphDraw {
   public:
-    Ctx(Adafruit_GFX *gfx, uint16_t x0, uint16_t y0, uint16_t fg, uint16_t bg,
+    Ctx(Adafruit_GFX *gfx, int16_t x0, int16_t y0, uint16_t fg, uint16_t bg,
         uint8_t sx, uint8_t sy)
         : gfx(gfx), x0(x0), y0(y0), fg(fg), bg(bg), sx(sx), sy(sy) {}
 
     void setPixel(int16_t x, int16_t y, bool set) const override {
+      Serial.printf("  - px(%d,%d,%d)", x, y, set);
+      if (!set && fg == bg)
+        return; // Drawing a transparent background. Do nothing.
+      uint16_t color = set ? fg : bg;
       if (sx == 1 && sy == 1) {
-        gfx->writePixel(x + x0, y + y0, set ? fg : bg);
+        Serial.printf(": writePixel(%d,%d,%d)", x0 + x, y0 + y, color);
+        gfx->writePixel(x0 + x, y0 + y, color);
       } else {
-        // Make a little box to accomodate scaling.
-        x *= sx;
-        y *= sy;
-        x += x0;
-        y += y0;
-        for (uint8_t yy = 0; yy < sy; ++yy) {
-          for (uint8_t xx = 0; xx < sx; ++xx) {
-            gfx->writePixel(x + xx, y + yy, set ? fg : bg);
-          }
-        }
+        gfx->fillRect(x0 + x * sx, y0 + y * sy, sx, sy, color);
       }
+      Serial.printf("\n");
     }
 
     Adafruit_GFX *gfx;
-    uint16_t x0;
-    uint16_t y0;
+    int16_t x0;
+    int16_t y0;
     uint16_t fg;
     uint16_t bg;
     uint8_t sx;
@@ -1331,6 +1330,8 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
 */
 /**************************************************************************/
 size_t Adafruit_GFX::write(uint8_t c) {
+  Serial.printf("{w:'%c':%#02x,sx:%u,cur:[%d,%d]}\n", //
+                c, c, textsize_x, cursor_x, cursor_y);
   if (c == '\n') {
     cursor_x = 0;
     cursor_y += textsize_y * font->yAdvance();
@@ -1349,11 +1350,15 @@ size_t Adafruit_GFX::write(uint8_t c) {
   if (wrap && (cursor_x + textsize_x * (g->xOffset() + g->width())) > _width) {
     cursor_x = 0;
     cursor_y += textsize_y * font->yAdvance();
+    // Serial.printf("wrapped to (%d,%d)\n", cursor_x, cursor_y);
   }
+
+  // Serial.printf("colors(%u, %u)\n", textcolor, textbgcolor);
 
   drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize_x,
            textsize_y);
   cursor_x += textsize_x * g->xAdvance(); // Advance x one char
+  // Serial.printf("Advanced:(%d,%d)\n", cursor_x, cursor_y);
   return 1;
 }
 
