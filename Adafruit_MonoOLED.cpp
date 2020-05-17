@@ -63,7 +63,10 @@ Adafruit_MonoOLED::Adafruit_MonoOLED(uint16_t w, uint16_t h, TwoWire *twi,
                                      int8_t rst_pin, uint32_t clkDuring,
                                      uint32_t clkAfter)
     : Adafruit_GFX(w, h), i2c_preclk(clkDuring), i2c_postclk(clkAfter),
-      dcPin(-1), csPin(-1), rstPin(rst_pin), _theWire(twi) {}
+      buffer(NULL), dcPin(-1), csPin(-1), rstPin(rst_pin) {
+  i2c_dev = NULL;
+  _theWire = twi;
+}
 
 /*!
     @brief  Constructor for SPI MonoOLED displays, using software (bitbang)
