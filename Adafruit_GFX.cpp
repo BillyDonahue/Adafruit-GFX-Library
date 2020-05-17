@@ -135,7 +135,7 @@ public:
   };
 
   uint8_t yAdvance() const override { return 8; }
-  uint8_t topToBaseline() const override { return 6; }
+  uint8_t yAdjustment() const override { return 6; }
 
   Glyph *getGlyph(uint16_t ch) const override {
     if (!_cp437 && ch >= 176)
@@ -236,16 +236,8 @@ void Adafruit_GFX::cp437(boolean x) { _cp437 = x; }
    @param    h   Display height, in pixels
 */
 /**************************************************************************/
-Adafruit_GFX::Adafruit_GFX(int16_t w, int16_t h) : WIDTH(w), HEIGHT(h) {
-  _width = WIDTH;
-  _height = HEIGHT;
-  rotation = 0;
-  cursor_y = cursor_x = 0;
-  textsize_x = textsize_y = 1;
-  textcolor = textbgcolor = 0xFFFF;
-  wrap = true;
-  font_ = new ClassicFont;
-}
+Adafruit_GFX::Adafruit_GFX(int16_t w, int16_t h)
+    : WIDTH(w), HEIGHT(h), font_(new ClassicFont()) {}
 
 Adafruit_GFX::~Adafruit_GFX() { delete font_; }
 
@@ -1271,6 +1263,8 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
   if (!glyph)
     return;
 
+  // Takes raw glyph pixel setting commands and applies scaling, coloring, and
+  // coordinate translation.
   class Draw : public GlyphDraw {
   public:
     Draw(Adafruit_GFX *gfx, int16_t x0, int16_t y0, uint16_t fg, uint16_t bg,
@@ -1298,7 +1292,7 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
   };
   Draw draw(this, x, y, color, bg, size_x, size_y);
   startWrite();
-  glyph->draw(draw);
+  glyph->draw(&draw);
   endWrite();
 }
 
@@ -1390,10 +1384,10 @@ void Adafruit_GFX::setFont(const GFXfont *f) {
 }
 
 void Adafruit_GFX::setAbstractFont(const AbstractFont *f) {
-  cursor_y += font_->topToBaseline();
+  cursor_y += font_->yAdjustment();
   delete font_;
   font_ = f ? f : new ClassicFont();
-  cursor_y -= font_->topToBaseline();
+  cursor_y -= font_->yAdjustment();
 }
 
 /**************************************************************************/
