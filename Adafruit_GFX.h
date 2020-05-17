@@ -64,14 +64,7 @@ public:
     uint8_t yAdvance() const override { return 8; }
     uint8_t cursorYAdjustment() const override { return 6; }
 
-    Glyph *getGlyph(uint16_t ch) const override {
-      if (!correctCodePage437 && ch >= 176)
-        ++ch; // Handle 'classic' charset behavior
-      if (ch >= 256)
-        return nullptr;
-      activeGlyph.ch = ch;
-      return &activeGlyph;
-    }
+    Glyph *getGlyph(uint16_t ch) const override;
 
     boolean correctCodePage437 = false;
     mutable Glyph activeGlyph;

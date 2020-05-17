@@ -103,6 +103,16 @@ inline uint8_t *pgm_read_bitmap_ptr(const GFXfont *gfxFont) {
   }
 #endif
 
+Adafruit_GFX::ClassicFont::Glyph *
+Adafruit_GFX::ClassicFont::getGlyph(uint16_t ch) const {
+  if (!correctCodePage437 && ch >= 176)
+    ++ch; // Handle 'classic' charset behavior
+  if (ch >= 256)
+    return nullptr;
+  activeGlyph.ch = ch;
+  return &activeGlyph;
+}
+
 void Adafruit_GFX::ClassicFont::Glyph::draw(GlyphDrawingContext *ctx) const {
   // Clip right, left, bottom, top
   // TODO: expose bounds from the GlyphDrawingContext?
