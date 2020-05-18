@@ -62,6 +62,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #define pgm_read_pointer(addr) ((void *)pgm_read_word(addr))
 #endif
 
+namespace {
+
 inline GFXglyph *pgm_read_glyph_ptr(const GFXfont *gfxFont, uint8_t c) {
 #ifdef __AVR__
   return &(((GFXglyph *)pgm_read_pointer(&gfxFont->glyph))[c]);
@@ -85,8 +87,6 @@ inline uint8_t *pgm_read_bitmap_ptr(const GFXfont *gfxFont) {
   return gfxFont->bitmap;
 #endif //__AVR__
 }
-
-namespace {
 
 template <typename T> void assignMin(T &a, const T &b) {
   if (b < a)
