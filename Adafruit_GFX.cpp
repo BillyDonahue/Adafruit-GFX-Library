@@ -1268,30 +1268,64 @@ void Adafruit_GFX::drawGlyph_(int16_t x, int16_t y,
       if (uncommitted_len == 0)
         return;
       bool &set = uncommitted_set;
-      if (!set && fg == bg)
-        return; // Drawing a transparent background. Do nothing.
-      int16_t &x = uncommitted_x;
-      int16_t &y = uncommitted_y;
-      uint16_t color = set ? fg : bg;
-      if (uncommitted_len == 1) {
-        if (sx == 1 && sy == 1) {
-          gfx->writePixel(x0 + x, y0 + y, color);
-        } else {
-          gfx->fillRect(x0 + x * sx, y0 + y * sy, sx, sy, color);
-        }
+      if (!set && fg == bg) {
+        // Drawing a transparent background. Do nothing.
       } else {
-        gfx->fillRect(x0 + x * sx, y0 + y * sy, sx * uncommitted_len, sy,
-                      color);
+        int16_t &x = uncommitted_x;
+        int16_t &y = uncommitted_y;
+        uint16_t color = set ? fg : bg;
+
+        if (0) {
+          Serial.print("[n:");
+          Serial.print(uncommitted_len);
+          Serial.print("]");
+        }
+
+        if (uncommitted_len == 1) {
+          if (sx == 1 && sy == 1) {
+            gfx->writePixel(x0 + x, y0 + y, color);
+          } else {
+            gfx->fillRect(x0 + x * sx, y0 + y * sy, sx, sy, color);
+          }
+        } else {
+          gfx->fillRect(x0 + x * sx, y0 + y * sy, sx, sy * uncommitted_len,
+                        color);
+        }
       }
       uncommitted_len = 0;
     }
 
     void setPixel(int16_t x, int16_t y, bool set) const override {
+      if (0) {
+        Serial.print(" px(");
+        Serial.print(x);
+        Serial.print(",");
+        Serial.print(y);
+        Serial.print(",");
+        Serial.print(set);
+        Serial.print(")");
+
+        Serial.print(",un(");
+        Serial.print(uncommitted_len);
+        Serial.print(",");
+        Serial.print(uncommitted_x);
+        Serial.print(",");
+        Serial.print(uncommitted_y);
+        Serial.print(",");
+        Serial.print(uncommitted_set);
+        Serial.print(")");
+      }
+
       if (uncommitted_len) {
         if (set == uncommitted_set) {
-          if (y == uncommitted_y) {
-            if (x == uncommitted_x + 1) {
+          if (x == uncommitted_x) {
+            if (y == uncommitted_y + uncommitted_len) {
               ++uncommitted_len;
+              if (0) {
+                Serial.print("[n:");
+                Serial.print(uncommitted_len);
+                Serial.print("]");
+              }
               return;
             }
           }
