@@ -103,6 +103,7 @@ template <typename T> void swap(T &a, T &b) {
   a = b;
   b = t;
 }
+
 } // namespace
 
 Adafruit_GFX::ClassicFont::Glyph *
