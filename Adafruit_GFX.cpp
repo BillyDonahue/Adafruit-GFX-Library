@@ -117,12 +117,6 @@ Adafruit_GFX::ClassicFont::getGlyph(uint16_t ch) const {
 }
 
 void Adafruit_GFX::ClassicFont::Glyph::draw(GlyphDrawingContext *ctx) const {
-  // Clip right, left, bottom, top
-  // TODO: expose bounds from the GlyphDrawingContext?
-  // if (x >= gfx->_width || (x + gw * size_x) <= 0 ||
-  //    y >= gfx->_height || (y + gh * size_y) <= 0)
-  //  return;
-
   for (int8_t i = 0; i < bmp_w; ++i) {
     uint8_t vline =
         i < xAdvance() ? (uint8_t)pgm_read_byte(&font[ch * bmp_w + i]) : 0;
