@@ -1256,18 +1256,58 @@ void Adafruit_GFX::drawGlyph_(int16_t x, int16_t y,
   public:
     Draw(Adafruit_GFX *gfx, int16_t x0, int16_t y0, uint16_t fg, uint16_t bg,
          uint8_t sx, uint8_t sy)
-        : gfx(gfx), x0(x0), y0(y0), fg(fg), bg(bg), sx(sx), sy(sy) {}
+        : gfx(gfx), x0(x0), y0(y0), fg(fg), bg(bg), sx(sx), sy(sy) {
+      gfx->startWrite();
+    }
+    ~Draw() {
+      commit();
+      gfx->endWrite();
+    }
 
-    void setPixel(int16_t x, int16_t y, bool set) const override {
+    void commit() const {
+      if (uncommitted_len == 0)
+        return;
+      bool &set = uncommitted_set;
       if (!set && fg == bg)
         return; // Drawing a transparent background. Do nothing.
+      int16_t &x = uncommitted_x;
+      int16_t &y = uncommitted_y;
       uint16_t color = set ? fg : bg;
-      if (sx == 1 && sy == 1) {
-        gfx->writePixel(x0 + x, y0 + y, color);
+      if (uncommitted_len == 1) {
+        if (sx == 1 && sy == 1) {
+          gfx->writePixel(x0 + x, y0 + y, color);
+        } else {
+          gfx->fillRect(x0 + x * sx, y0 + y * sy, sx, sy, color);
+        }
       } else {
-        gfx->fillRect(x0 + x * sx, y0 + y * sy, sx, sy, color);
+        gfx->fillRect(x0 + x * sx, y0 + y * sy, sx * uncommitted_len, sy,
+                      color);
       }
+      uncommitted_len = 0;
     }
+
+    void setPixel(int16_t x, int16_t y, bool set) const override {
+      if (uncommitted_len) {
+        if (set == uncommitted_set) {
+          if (y == uncommitted_y) {
+            if (x == uncommitted_x + 1) {
+              ++uncommitted_len;
+              return;
+            }
+          }
+        }
+        commit();
+      }
+      uncommitted_len = 1;
+      uncommitted_set = set;
+      uncommitted_x = x;
+      uncommitted_y = y;
+    }
+
+    mutable uint8_t uncommitted_len = 0;
+    mutable bool uncommitted_set;
+    mutable int16_t uncommitted_x;
+    mutable int16_t uncommitted_y;
 
     Adafruit_GFX *gfx;
     int16_t x0;
@@ -1278,9 +1318,7 @@ void Adafruit_GFX::drawGlyph_(int16_t x, int16_t y,
     uint8_t sy;
   };
   Draw draw(this, x, y, color, bg, size_x, size_y);
-  startWrite();
   g->draw(&draw);
-  endWrite();
 }
 
 /**************************************************************************/
