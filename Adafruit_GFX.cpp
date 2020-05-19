@@ -42,14 +42,15 @@ POSSIBILITY OF SUCH DAMAGE.
 // Many (but maybe not all) non-AVR board installs define macros
 // for compatibility with existing PROGMEM-reading AVR code.
 // Do our own checks and defines here for good measure...
+
 #ifndef pgm_read_byte
-#define pgm_read_byte(addr) (*(const uint8_t *)(addr))
+#define pgm_read_byte(addr) (*(const unsigned char *)(addr))
 #endif
 #ifndef pgm_read_word
-#define pgm_read_word(addr) (*(const uint16_t *)(addr))
+#define pgm_read_word(addr) (*(const unsigned short *)(addr))
 #endif
 #ifndef pgm_read_dword
-#define pgm_read_dword(addr) (*(const uint32_t *)(addr))
+#define pgm_read_dword(addr) (*(const unsigned long *)(addr))
 #endif
 
 namespace {
@@ -66,7 +67,6 @@ template <typename T> T pgmRead(const T *p, SizeTag<4>) {
 template <typename T> T pgmRead(const T *p) {
   return pgmRead(p, SizeTag<sizeof(T)>());
 }
-
 template <typename T> void assignMin(T &a, const T &b) {
   if (b < a)
     a = b;
@@ -76,7 +76,6 @@ template <typename T> void assignMax(T &a, const T &b) {
   if (b > a)
     a = b;
 }
-
 template <typename T> void swap(T &a, T &b) {
   T t = a;
   a = b;
@@ -1450,37 +1449,50 @@ void Adafruit_GFX::setAbstractFont(const Adafruit_GFX_FontInterface *f,
 void Adafruit_GFX::charBounds(unsigned char c, int16_t *x, int16_t *y,
                               int16_t *minx, int16_t *miny, int16_t *maxx,
                               int16_t *maxy) {
+  if (0) {
+    Serial.print("cb(");
+    Serial.print((unsigned)c);
+    Serial.print(",");
+    Serial.print(*x);
+    Serial.print(",");
+    Serial.print(*y);
+    Serial.println(")");
+  }
   if (c == '\n') {
     *x = 0;
     *y += textsize_y * font_->yAdvance();
+    return;
   }
   if (c == '\r') {
-    // ignored
+    return; // ignored
   }
 
   const Adafruit_GFX_FontInterface::Glyph *g = font_->getGlyph(c);
-  if (!g)
+  if (!g) {
+    Serial.println("no glyph");
     return;
+  }
 
-  uint8_t gw = g->width();
-  uint8_t gh = g->height();
-  uint8_t xa = g->xAdvance();
-  int8_t xo = g->xOffset();
-  int8_t yo = g->yOffset();
+  int16_t xo = g->xOffset();
+  int16_t yo = g->yOffset();
+  uint16_t gw = g->width();
+  uint16_t gh = g->height();
   if (wrap && ((*x + textsize_x * (xo + gw)) > _width)) {
     *x = 0;
     *y += textsize_y * font_->yAdvance();
   }
-  int16_t x1 = *x + textsize_x * xo;
-  int16_t y1 = *y + textsize_y * yo;
-  int16_t x2 = x1 + textsize_x * gw - 1;
-  int16_t y2 = y1 + textsize_y * gh - 1;
 
+  int16_t x1 = *x + textsize_x * xo;
+  int16_t x2 = x1 + textsize_x * gw - 1;
   assignMin(*minx, x1);
-  assignMin(*miny, y1);
   assignMax(*maxx, x2);
+
+  int16_t y1 = *y + textsize_y * yo;
+  int16_t y2 = y1 + textsize_y * gh - 1;
+  assignMin(*miny, y1);
   assignMax(*maxy, y2);
-  *x += textsize_x * xa;
+
+  *x += textsize_x * g->xAdvance();
 }
 
 /**************************************************************************/
