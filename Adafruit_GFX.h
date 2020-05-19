@@ -9,67 +9,87 @@
 #endif
 #include "gfxfont.h"
 
-/// A generic graphics superclass that can handle all sorts of drawing. At a
-/// minimum you can subclass and provide drawPixel(). At a maximum you can do a
-/// ton of overriding to optimize. Used for any/all Adafruit displays!
-class Adafruit_GFX : public Print {
-
+class Adafruit_GFX_FontInterface {
 public:
-  class GlyphDrawingContext {
+  class DrawingContext {
   public:
     // set or clear one logical pixel.
     virtual void setPixel(int16_t x, int16_t y, bool set) const = 0;
   };
 
-  class AbstractFont {
+  class Glyph {
   public:
-    class Glyph {
-    public:
-      virtual uint8_t width() const = 0;
-      virtual uint8_t height() const = 0;
-      virtual uint8_t xAdvance() const = 0;
-      virtual int8_t xOffset() const = 0;
-      virtual int8_t yOffset() const = 0;
-      virtual void draw(GlyphDrawingContext *ctx) const = 0;
-    };
-
-    virtual ~AbstractFont() = default;
-    virtual uint8_t yAdvance() const = 0;
-    virtual Glyph *getGlyph(uint16_t ch) const = 0;
-
-    // The amount removed from cursorY when this font is installed,
-    // and added to cursorY when this font is uninstalled.
-    // Only ClassicFont does anything interesting here.
-    // ClassicFont interprets cursor as topleft corner of glyph.
-    // So when it is replaced, the cursor moves down by 6pixels so
-    // the baseline of subsequent gfx->print statements will match.
-    virtual uint8_t cursorYAdjustment() const { return 0; }
+    virtual uint8_t width() const = 0;
+    virtual uint8_t height() const = 0;
+    virtual uint8_t xAdvance() const = 0;
+    virtual int8_t xOffset() const = 0;
+    virtual int8_t yOffset() const = 0;
+    virtual void draw(DrawingContext *ctx) const = 0;
   };
 
-  class ClassicFont : public AbstractFont {
+  virtual ~Adafruit_GFX_FontInterface() = default;
+  virtual uint8_t yAdvance() const = 0;
+  virtual Glyph *getGlyph(uint16_t ch) const = 0;
+
+  // The amount removed from cursorY when this font is installed,
+  // and added to cursorY when this font is uninstalled.
+  // Only GFXClassicFont does anything interesting here.
+  // GFXClassicFont interprets cursor as topleft corner of glyph.
+  // So when it is replaced, the cursor moves down by 6pixels so
+  // the baseline of subsequent gfx->print statements will match.
+  virtual uint8_t cursorYAdjustment() const { return 0; }
+};
+
+class Adafruit_GFX_ClassicFont : public Adafruit_GFX_FontInterface {
+public:
+  class Glyph : public Adafruit_GFX_FontInterface::Glyph {
   public:
-    class Glyph : public AbstractFont::Glyph {
-    public:
-      static const uint8_t bmp_w = 5;
-      static const uint8_t bmp_h = 8;
-      uint8_t width() const override { return bmp_w; }
-      uint8_t height() const override { return bmp_h; }
-      uint8_t xAdvance() const override { return 6; }
-      int8_t xOffset() const override { return 0; }
-      int8_t yOffset() const override { return 0; }
-      void draw(GlyphDrawingContext *ctx) const override;
-      uint8_t ch;
-    };
-
-    uint8_t yAdvance() const override { return 8; }
-    uint8_t cursorYAdjustment() const override { return 6; }
-
-    Glyph *getGlyph(uint16_t ch) const override;
-
-    boolean correctCodePage437 = false;
-    mutable Glyph activeGlyph;
+    static const uint8_t bmp_w = 5;
+    static const uint8_t bmp_h = 8;
+    uint8_t width() const override { return bmp_w; }
+    uint8_t height() const override { return bmp_h; }
+    uint8_t xAdvance() const override { return 6; }
+    int8_t xOffset() const override { return 0; }
+    int8_t yOffset() const override { return 0; }
+    void draw(Adafruit_GFX_FontInterface::DrawingContext *ctx) const override;
+    uint8_t ch;
   };
 
+  uint8_t yAdvance() const override { return 8; }
+  uint8_t cursorYAdjustment() const override { return 6; }
+
+  Glyph *getGlyph(uint16_t ch) const override;
+
+  boolean correctCodePage437 = false;
+  mutable Glyph activeGlyph;
+};
+
+class Adafruit_GFX_CustomFontAdapter : public Adafruit_GFX_FontInterface {
+public:
+  class Glyph : public Adafruit_GFX_FontInterface::Glyph {
+  public:
+    uint8_t width() const override;
+    uint8_t height() const override;
+    uint8_t xAdvance() const override;
+    int8_t xOffset() const override;
+    int8_t yOffset() const override;
+    void draw(Adafruit_GFX_FontInterface::DrawingContext *ctx) const override;
+    GFXglyph *glyph;
+    uint8_t *bitmap;
+  };
+  explicit Adafruit_GFX_CustomFontAdapter(const GFXfont *f) : gfxFont(f) {}
+  uint8_t yAdvance() const override;
+  Glyph *getGlyph(uint16_t ch) const override;
+
+  const GFXfont *gfxFont;
+  mutable Glyph activeGlyph;
+};
+
+/// A generic graphics superclass that can handle all sorts of drawing. At a
+/// minimum you can subclass and provide drawPixel(). At a maximum you can do a
+/// ton of overriding to optimize. Used for any/all Adafruit displays!
+class Adafruit_GFX : public Print {
+public:
   Adafruit_GFX(int16_t w, int16_t h); // Constructor
   virtual ~Adafruit_GFX();
 
@@ -173,7 +193,7 @@ public:
   void setTextSize(uint8_t s);
   void setTextSize(uint8_t sx, uint8_t sy);
   void setFont(const GFXfont *f = NULL);
-  void setAbstractFont(const AbstractFont *f);
+  void setAbstractFont(const Adafruit_GFX_FontInterface *f);
 
   /**********************************************************************/
   /*!
@@ -305,11 +325,13 @@ protected:
   GFXfont *gfxFont;     ///< Pointer to special font
 
 private:
-  void drawGlyph_(int16_t x, int16_t y, const AbstractFont::Glyph *g,
-                  uint16_t color, uint16_t bg, uint8_t size_x, uint8_t size_y);
+  void drawGlyph_(int16_t x, int16_t y,
+                  const Adafruit_GFX_FontInterface::Glyph *g, uint16_t color,
+                  uint16_t bg, uint8_t size_x, uint8_t size_y);
   void write_(uint16_t c);
-  ClassicFont classicFont_; ///< Default 6x8 font covering the CP437 charset.
-  const AbstractFont *font_ = &classicFont_; ///< owned if != &classicFont_
+  Adafruit_GFX_ClassicFont classicFont_;
+  /// owned if != &classicFont_
+  const Adafruit_GFX_FontInterface *font_ = &classicFont_;
 };
 
 /// A simple drawn button UI element
