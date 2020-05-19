@@ -52,7 +52,7 @@ public:
     int8_t xOffset() const override { return 0; }
     int8_t yOffset() const override { return 0; }
     void draw(Adafruit_GFX_FontInterface::DrawingContext *ctx) const override;
-    uint8_t ch;
+    uint8_t ch = 0;
   };
 
   uint8_t yAdvance() const override { return 8; }
@@ -64,7 +64,7 @@ public:
 
 private:
   boolean correctCodePage437_ = false;
-  mutable Glyph activeGlyph_ = {0};
+  mutable Glyph activeGlyph_;
 };
 
 class Adafruit_GFX_CustomFontAdapter : public Adafruit_GFX_FontInterface {
