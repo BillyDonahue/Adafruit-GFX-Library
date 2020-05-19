@@ -218,7 +218,7 @@ Adafruit_GFX::Adafruit_GFX(int16_t w, int16_t h) : WIDTH(w), HEIGHT(h) {
 }
 
 Adafruit_GFX::~Adafruit_GFX() {
-  if (font_ != &classicFont_) {
+  if (fontOwned_) {
     delete font_;
   }
 }
@@ -1436,16 +1436,22 @@ void Adafruit_GFX::setRotation(uint8_t x) {
 */
 /**************************************************************************/
 void Adafruit_GFX::setFont(const GFXfont *f) {
-  setAbstractFont(f ? new Adafruit_GFX_CustomFontAdapter(f) : nullptr);
+  setAbstractFont(f ? new Adafruit_GFX_CustomFontAdapter(f) : nullptr, true);
 }
 
-void Adafruit_GFX::setAbstractFont(const Adafruit_GFX_FontInterface *f) {
-  cursor_y += font_->cursorYAdjustment();
-  if (font_ != &classicFont_) {
+void Adafruit_GFX::setAbstractFont(const Adafruit_GFX_FontInterface *f,
+                                   bool own) {
+  cursor_y += font_->cursorYAdjustment(); // Undo font_'s y-adjustment.
+  if (fontOwned_)
     delete font_;
+  if (f) {
+    font_ = f;
+    fontOwned_ = own;
+  } else {
+    font_ = &classicFont_;
+    fontOwned_ = own;
   }
-  font_ = f ? f : &classicFont_;
-  cursor_y -= font_->cursorYAdjustment();
+  cursor_y -= font_->cursorYAdjustment(); // Install font_'s y-adjustment.
 }
 
 /**************************************************************************/

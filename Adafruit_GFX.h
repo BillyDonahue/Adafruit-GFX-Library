@@ -193,7 +193,7 @@ public:
   void setTextSize(uint8_t s);
   void setTextSize(uint8_t sx, uint8_t sy);
   void setFont(const GFXfont *f = NULL);
-  void setAbstractFont(const Adafruit_GFX_FontInterface *f);
+  void setAbstractFont(const Adafruit_GFX_FontInterface *f, bool own);
 
   /**********************************************************************/
   /*!
@@ -329,9 +329,10 @@ private:
                   const Adafruit_GFX_FontInterface::Glyph *g, uint16_t color,
                   uint16_t bg, uint8_t size_x, uint8_t size_y);
   void write_(uint16_t c);
+
   Adafruit_GFX_ClassicFont classicFont_;
-  /// owned if != &classicFont_
   const Adafruit_GFX_FontInterface *font_ = &classicFont_;
+  boolean fontOwned_ = false; ///< We don't delete classicFont_.
 };
 
 /// A simple drawn button UI element
