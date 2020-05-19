@@ -64,7 +64,7 @@ public:
 
 private:
   boolean correctCodePage437_ = false;
-  mutable Glyph activeGlyph_;
+  mutable Glyph activeGlyph_ = {0};
 };
 
 class Adafruit_GFX_CustomFontAdapter : public Adafruit_GFX_FontInterface {
@@ -77,8 +77,8 @@ public:
     int8_t xOffset() const override;
     int8_t yOffset() const override;
     void draw(Adafruit_GFX_FontInterface::DrawingContext *ctx) const override;
-    GFXglyph *glyph;
-    uint8_t *bitmap;
+    GFXglyph *glyph = nullptr;
+    uint8_t *bitmap = nullptr;
   };
   explicit Adafruit_GFX_CustomFontAdapter(const GFXfont *f) : font_(f) {}
   uint8_t yAdvance() const override;
@@ -402,8 +402,8 @@ class GFXcanvas1 : public Adafruit_GFX {
 public:
   GFXcanvas1(uint16_t w, uint16_t h);
   ~GFXcanvas1(void);
-  void drawPixel(int16_t x, int16_t y, uint16_t color);
-  void fillScreen(uint16_t color);
+  void drawPixel(int16_t x, int16_t y, uint16_t color) override;
+  void fillScreen(uint16_t color) override;
   /**********************************************************************/
   /*!
     @brief    Get a pointer to the internal buffer memory
@@ -421,9 +421,9 @@ class GFXcanvas8 : public Adafruit_GFX {
 public:
   GFXcanvas8(uint16_t w, uint16_t h);
   ~GFXcanvas8(void);
-  void drawPixel(int16_t x, int16_t y, uint16_t color);
-  void fillScreen(uint16_t color);
-  void writeFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color);
+  void drawPixel(int16_t x, int16_t y, uint16_t color) override;
+  void fillScreen(uint16_t color) override;
+  void writeFastHLine(int16_t x, int16_t y, int16_t w, uint16_t color) override;
   /**********************************************************************/
   /*!
    @brief    Get a pointer to the internal buffer memory
@@ -441,8 +441,8 @@ class GFXcanvas16 : public Adafruit_GFX {
 public:
   GFXcanvas16(uint16_t w, uint16_t h);
   ~GFXcanvas16(void);
-  void drawPixel(int16_t x, int16_t y, uint16_t color);
-  void fillScreen(uint16_t color);
+  void drawPixel(int16_t x, int16_t y, uint16_t color) override;
+  void fillScreen(uint16_t color) override;
   void byteSwap(void);
   /**********************************************************************/
   /*!

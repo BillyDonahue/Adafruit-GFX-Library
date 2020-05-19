@@ -42,50 +42,29 @@ POSSIBILITY OF SUCH DAMAGE.
 // Many (but maybe not all) non-AVR board installs define macros
 // for compatibility with existing PROGMEM-reading AVR code.
 // Do our own checks and defines here for good measure...
-
 #ifndef pgm_read_byte
-#define pgm_read_byte(addr) (*(const unsigned char *)(addr))
+#define pgm_read_byte(addr) (*(const uint8_t *)(addr))
 #endif
 #ifndef pgm_read_word
-#define pgm_read_word(addr) (*(const unsigned short *)(addr))
+#define pgm_read_word(addr) (*(const uint16_t *)(addr))
 #endif
 #ifndef pgm_read_dword
-#define pgm_read_dword(addr) (*(const unsigned long *)(addr))
-#endif
-
-// Pointers are a peculiar case...typically 16-bit on AVR boards,
-// 32 bits elsewhere.  Try to accommodate both...
-
-#if !defined(__INT_MAX__) || (__INT_MAX__ > 0xFFFF)
-#define pgm_read_pointer(addr) ((void *)pgm_read_dword(addr))
-#else
-#define pgm_read_pointer(addr) ((void *)pgm_read_word(addr))
+#define pgm_read_dword(addr) (*(const uint32_t *)(addr))
 #endif
 
 namespace {
-
-inline GFXglyph *pgm_read_glyph_ptr(const GFXfont *gfxFont, uint8_t c) {
-#ifdef __AVR__
-  return &(((GFXglyph *)pgm_read_pointer(&gfxFont->glyph))[c]);
-#else
-  // expression in __AVR__ section may generate "dereferencing type-punned
-  // pointer will break strict-aliasing rules" warning In fact, on other
-  // platforms (such as STM32) there is no need to do this pointer magic as
-  // program memory may be read in a usual way So expression may be simplified
-  return gfxFont->glyph + c;
-#endif //__AVR__
+template <size_t N> struct SizeTag {};
+template <typename T> T pgmRead(const T *p, SizeTag<1>) {
+  return (T)pgm_read_byte(p);
 }
-
-inline uint8_t *pgm_read_bitmap_ptr(const GFXfont *gfxFont) {
-#ifdef __AVR__
-  return (uint8_t *)pgm_read_pointer(&gfxFont->bitmap);
-#else
-  // expression in __AVR__ section generates "dereferencing type-punned pointer
-  // will break strict-aliasing rules" warning In fact, on other platforms (such
-  // as STM32) there is no need to do this pointer magic as program memory may
-  // be read in a usual way So expression may be simplified
-  return gfxFont->bitmap;
-#endif //__AVR__
+template <typename T> T pgmRead(const T *p, SizeTag<2>) {
+  return (T)pgm_read_word(p);
+}
+template <typename T> T pgmRead(const T *p, SizeTag<4>) {
+  return (T)pgm_read_dword(p);
+}
+template <typename T> T pgmRead(const T *p) {
+  return pgmRead(p, SizeTag<sizeof(T)>());
 }
 
 template <typename T> void assignMin(T &a, const T &b) {
@@ -121,34 +100,34 @@ void Adafruit_GFX_ClassicFont::Glyph::draw(
   const uint8_t *bmp = font + ch * bmp_w;
   uint8_t xa = xAdvance();
   for (int8_t x = 0; x < bmp_w; ++x) {
-    uint8_t v = x < xa ? (uint8_t)pgm_read_byte(bmp++) : 0;
+    uint8_t v = x < xa ? pgmRead(bmp++) : 0;
     for (int8_t y = 0; y < bmp_h; ++y, v >>= 1)
       ctx->setPixel(x, y, v & 1);
   }
 }
 
 uint8_t Adafruit_GFX_CustomFontAdapter::Glyph::width() const {
-  return pgm_read_byte(&glyph->width);
+  return pgmRead(&glyph->width);
 }
 uint8_t Adafruit_GFX_CustomFontAdapter::Glyph::height() const {
-  return pgm_read_byte(&glyph->height);
+  return pgmRead(&glyph->height);
 }
 uint8_t Adafruit_GFX_CustomFontAdapter::Glyph::xAdvance() const {
-  return pgm_read_byte(&glyph->xAdvance);
+  return pgmRead(&glyph->xAdvance);
 }
 int8_t Adafruit_GFX_CustomFontAdapter::Glyph::xOffset() const {
-  return pgm_read_byte(&glyph->xOffset);
+  return pgmRead(&glyph->xOffset);
 }
 int8_t Adafruit_GFX_CustomFontAdapter::Glyph::yOffset() const {
-  return pgm_read_byte(&glyph->yOffset);
+  return pgmRead(&glyph->yOffset);
 }
 void Adafruit_GFX_CustomFontAdapter::Glyph::draw(
     Adafruit_GFX_FontInterface::DrawingContext *ctx) const {
   uint16_t bo = 0;
-  uint8_t w = pgm_read_byte(&glyph->width);
-  uint8_t h = pgm_read_byte(&glyph->height);
-  int16_t xo = (int8_t)pgm_read_byte(&glyph->xOffset);
-  int16_t yo = (int8_t)pgm_read_byte(&glyph->yOffset);
+  uint8_t w = pgmRead(&glyph->width);
+  uint8_t h = pgmRead(&glyph->height);
+  int16_t xo = pgmRead(&glyph->xOffset);
+  int16_t yo = pgmRead(&glyph->yOffset);
   uint8_t bits = 0;
   uint8_t bit = 0;
 
@@ -173,7 +152,7 @@ void Adafruit_GFX_CustomFontAdapter::Glyph::draw(
   for (int16_t yg = 0; yg < h; ++yg) {
     for (int16_t xg = 0; xg < w; ++xg) {
       if (!(bit++ & 7))
-        bits = pgm_read_byte(&bitmap[bo++]);
+        bits = pgmRead(&bitmap[bo++]);
       if (bits & 0x80) {
         ctx->setPixel(xo + xg, yo + yg, true);
       }
@@ -183,18 +162,18 @@ void Adafruit_GFX_CustomFontAdapter::Glyph::draw(
 }
 
 uint8_t Adafruit_GFX_CustomFontAdapter::yAdvance() const {
-  return pgm_read_byte(&font_->yAdvance);
+  return pgmRead(&font_->yAdvance);
 }
 
 Adafruit_GFX_CustomFontAdapter::Glyph *
 Adafruit_GFX_CustomFontAdapter::getGlyph(uint16_t ch) const {
-  uint16_t first = pgm_read_word(&font_->first);
-  uint16_t last = pgm_read_word(&font_->last);
+  uint16_t first = pgmRead(&font_->first);
+  uint16_t last = pgmRead(&font_->last);
   if (ch < first || ch > last)
     return nullptr;
-  activeGlyph_.glyph = pgm_read_glyph_ptr(font_, ch - first);
-  uint8_t *bitmap = pgm_read_bitmap_ptr(font_);
-  uint16_t bo = pgm_read_word(&activeGlyph_.glyph->bitmapOffset);
+  activeGlyph_.glyph = pgmRead(&font_->glyph) + (ch - first);
+  uint8_t *bitmap = pgmRead(&font_->bitmap);
+  uint16_t bo = pgmRead(&activeGlyph_.glyph->bitmapOffset);
   activeGlyph_.bitmap = bitmap + bo;
   return &activeGlyph_;
 }
@@ -830,7 +809,7 @@ void Adafruit_GFX::drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
       if (i & 7)
         byte <<= 1;
       else
-        byte = pgm_read_byte(&bitmap[j * byteWidth + i / 8]);
+        byte = pgmRead(&bitmap[j * byteWidth + i / 8]);
       if (byte & 0x80)
         writePixel(x + i, y, color);
     }
@@ -865,7 +844,7 @@ void Adafruit_GFX::drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
       if (i & 7)
         byte <<= 1;
       else
-        byte = pgm_read_byte(&bitmap[j * byteWidth + i / 8]);
+        byte = pgmRead(&bitmap[j * byteWidth + i / 8]);
       writePixel(x + i, y, (byte & 0x80) ? color : bg);
     }
   }
@@ -964,7 +943,7 @@ void Adafruit_GFX::drawXBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
       if (i & 7)
         byte >>= 1;
       else
-        byte = pgm_read_byte(&bitmap[j * byteWidth + i / 8]);
+        byte = pgmRead(&bitmap[j * byteWidth + i / 8]);
       // Nearly identical to drawBitmap(), only the bit order
       // is reversed here (left-to-right = LSB to MSB):
       if (byte & 0x01)
@@ -992,7 +971,7 @@ void Adafruit_GFX::drawGrayscaleBitmap(int16_t x, int16_t y,
   startWrite();
   for (int16_t j = 0; j < h; j++, y++) {
     for (int16_t i = 0; i < w; i++) {
-      writePixel(x + i, y, (uint8_t)pgm_read_byte(&bitmap[j * w + i]));
+      writePixel(x + i, y, pgmRead(&bitmap[j * w + i]));
     }
   }
   endWrite();
@@ -1048,9 +1027,9 @@ void Adafruit_GFX::drawGrayscaleBitmap(int16_t x, int16_t y,
       if (i & 7)
         byte <<= 1;
       else
-        byte = pgm_read_byte(&mask[j * bw + i / 8]);
+        byte = pgmRead(&mask[j * bw + i / 8]);
       if (byte & 0x80) {
-        writePixel(x + i, y, (uint8_t)pgm_read_byte(&bitmap[j * w + i]));
+        writePixel(x + i, y, pgmRead(&bitmap[j * w + i]));
       }
     }
   }
@@ -1107,7 +1086,7 @@ void Adafruit_GFX::drawRGBBitmap(int16_t x, int16_t y, const uint16_t bitmap[],
   startWrite();
   for (int16_t j = 0; j < h; j++, y++) {
     for (int16_t i = 0; i < w; i++) {
-      writePixel(x + i, y, pgm_read_word(&bitmap[j * w + i]));
+      writePixel(x + i, y, pgmRead(&bitmap[j * w + i]));
     }
   }
   endWrite();
@@ -1159,9 +1138,9 @@ void Adafruit_GFX::drawRGBBitmap(int16_t x, int16_t y, const uint16_t bitmap[],
       if (i & 7)
         byte <<= 1;
       else
-        byte = pgm_read_byte(&mask[j * bw + i / 8]);
+        byte = pgmRead(&mask[j * bw + i / 8]);
       if (byte & 0x80) {
-        writePixel(x + i, y, pgm_read_word(&bitmap[j * w + i]));
+        writePixel(x + i, y, pgmRead(&bitmap[j * w + i]));
       }
     }
   }
@@ -1587,7 +1566,7 @@ void Adafruit_GFX::getTextBounds(const __FlashStringHelper *str, int16_t x,
 
   int16_t minx = _width, miny = _height, maxx = -1, maxy = -1;
 
-  while ((c = pgm_read_byte(s++)))
+  while ((c = pgmRead(s++)))
     charBounds(c, &x, &y, &minx, &miny, &maxx, &maxy);
 
   if (maxx >= minx) {
@@ -1879,9 +1858,9 @@ void GFXcanvas1::drawPixel(int16_t x, int16_t y, uint16_t color) {
     uint8_t *ptr = &buffer[(x / 8) + y * ((WIDTH + 7) / 8)];
 #ifdef __AVR__
     if (color)
-      *ptr |= pgm_read_byte(&GFXsetBit[x & 7]);
+      *ptr |= pgmRead(&GFXsetBit[x & 7]);
     else
-      *ptr &= pgm_read_byte(&GFXclrBit[x & 7]);
+      *ptr &= pgmRead(&GFXclrBit[x & 7]);
 #else
     if (color)
       *ptr |= 0x80 >> (x & 7);
