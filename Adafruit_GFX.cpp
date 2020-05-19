@@ -108,12 +108,12 @@ template <typename T> void swap(T &a, T &b) {
 
 Adafruit_GFX_ClassicFont::Glyph *
 Adafruit_GFX_ClassicFont::getGlyph(uint16_t ch) const {
-  if (!correctCodePage437 && ch >= 176)
+  if (!correctCodePage437_ && ch >= 176)
     ++ch; // Handle 'classic' charset behavior
   if (ch >= 256)
     return nullptr;
-  activeGlyph.ch = ch;
-  return &activeGlyph;
+  activeGlyph_.ch = ch;
+  return &activeGlyph_;
 }
 
 void Adafruit_GFX_ClassicFont::Glyph::draw(
@@ -183,20 +183,20 @@ void Adafruit_GFX_CustomFontAdapter::Glyph::draw(
 }
 
 uint8_t Adafruit_GFX_CustomFontAdapter::yAdvance() const {
-  return pgm_read_byte(&gfxFont->yAdvance);
+  return pgm_read_byte(&font_->yAdvance);
 }
 
 Adafruit_GFX_CustomFontAdapter::Glyph *
 Adafruit_GFX_CustomFontAdapter::getGlyph(uint16_t ch) const {
-  uint16_t first = pgm_read_word(&gfxFont->first);
-  uint16_t last = pgm_read_word(&gfxFont->last);
+  uint16_t first = pgm_read_word(&font_->first);
+  uint16_t last = pgm_read_word(&font_->last);
   if (ch < first || ch > last)
     return nullptr;
-  activeGlyph.glyph = pgm_read_glyph_ptr(gfxFont, ch - first);
-  uint8_t *bitmap = pgm_read_bitmap_ptr(gfxFont);
-  uint16_t bo = pgm_read_word(&activeGlyph.glyph->bitmapOffset);
-  activeGlyph.bitmap = bitmap + bo;
-  return &activeGlyph;
+  activeGlyph_.glyph = pgm_read_glyph_ptr(font_, ch - first);
+  uint8_t *bitmap = pgm_read_bitmap_ptr(font_);
+  uint16_t bo = pgm_read_word(&activeGlyph_.glyph->bitmapOffset);
+  activeGlyph_.bitmap = bitmap + bo;
+  return &activeGlyph_;
 }
 
 /**************************************************************************/

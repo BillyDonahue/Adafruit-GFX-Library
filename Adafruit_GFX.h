@@ -60,8 +60,11 @@ public:
 
   Glyph *getGlyph(uint16_t ch) const override;
 
-  boolean correctCodePage437 = false;
-  mutable Glyph activeGlyph;
+  void setCorrectCodePage437(boolean x) { correctCodePage437_ = x; }
+
+private:
+  boolean correctCodePage437_ = false;
+  mutable Glyph activeGlyph_;
 };
 
 class Adafruit_GFX_CustomFontAdapter : public Adafruit_GFX_FontInterface {
@@ -77,12 +80,13 @@ public:
     GFXglyph *glyph;
     uint8_t *bitmap;
   };
-  explicit Adafruit_GFX_CustomFontAdapter(const GFXfont *f) : gfxFont(f) {}
+  explicit Adafruit_GFX_CustomFontAdapter(const GFXfont *f) : font_(f) {}
   uint8_t yAdvance() const override;
   Glyph *getGlyph(uint16_t ch) const override;
 
-  const GFXfont *gfxFont;
-  mutable Glyph activeGlyph;
+private:
+  const GFXfont *font_;
+  mutable Glyph activeGlyph_;
 };
 
 /// A generic graphics superclass that can handle all sorts of drawing. At a
@@ -252,7 +256,7 @@ public:
     @param  x  true = enable (new behavior), false = disable (old behavior)
   */
   /**********************************************************************/
-  void cp437(boolean x = true) { classicFont_.correctCodePage437 = x; }
+  void cp437(boolean x = true) { classicFont_.setCorrectCodePage437(x); }
 
   using Print::write;
 #if ARDUINO >= 100
