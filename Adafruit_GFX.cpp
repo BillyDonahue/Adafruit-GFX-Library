@@ -1151,40 +1151,32 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
       c++; // Handle 'classic' charset behavior
 
     startWrite();
-    for (int8_t i = 0; i < 5; i++) { // Char bitmap = 5 columns
-      uint8_t count = 0;
-      uint8_t j_new, j, line = pgm_read_byte(&font[c * 5 + i]);
-      j = j_new = 0;
-      while (j < 8) {
-        while (j_new < 8 && (line & 1) == 0) { // bg pixels
-          count++;                             // count up bg pixels in a row
-          j_new++;
-          line >>= 1;
+    for (int8_t i = 0; i < 5; ++i, x += size_x) { // Char bitmap = 5 columns
+      uint8_t line = pgm_read_byte(&font[c * 5 + i]);
+      for (uint8_t j = 0; j < 8;) {
+        {
+          uint8_t n = 0;
+          for (; j + n < 8 && line & 1 == 0; ++n, line >>= 1)
+            ;
+          if (n && bg != color) { // need to draw background color
+            writeFillRect(x, y + j * size_y, size_x, size_y * n, bg);
+          }
         }
-        if (count && bg != color) { // need to draw background color
-          writeFillRect(x + i * size_x, y + j * size_y, size_x, size_y * count,
-                        bg);
+        {
+          uint8_t n = 0;
+          for (; j + n < 8 && line & 1 == 1; ++n, line >>= 1)
+            ;
+          if (n) { // need to draw foreground color
+            writeFillRect(x, y + j * size_y, size_x, size_y * n, color);
+          }
         }
-        count = 0;
-        j = j_new;
-        while (j_new < 8 && (line & 1) == 1) { // fg pixels
-          count++;                             // count up fg pixels
-          j_new++;
-          line >>= 1;
-        }
-        if (count) { // need to draw foreground color
-          writeFillRect(x + i * size_x, y + j * size_y, size_x, size_y * count,
-                        color);
-          count = 0;
-          j = j_new;
-        }
-      } // while (j < 8)
+      }
     }
     if (bg != color) { // If opaque, draw vertical line for last column
-      writeFillRect(x + 5 * size_x, y, size_x, 8 * size_y, bg);
+      writeFillRect(x, y, size_x, 8 * size_y, bg);
     }
     endWrite();
-
+    return;
   } else { // Custom font
 
     // Character is assumed previously filtered by write() to eliminate
