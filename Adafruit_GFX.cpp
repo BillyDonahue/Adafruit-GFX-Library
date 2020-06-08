@@ -1151,32 +1151,23 @@ void Adafruit_GFX::drawChar(int16_t x, int16_t y, unsigned char c,
       c++; // Handle 'classic' charset behavior
 
     startWrite();
-    for (int8_t i = 0; i < 5; ++i, x += size_x) { // Char bitmap = 5 columns
+    for (int8_t i = 0; i < 5; i++) { // Char bitmap = 5 columns
       uint8_t line = pgm_read_byte(&font[c * 5 + i]);
-      for (uint8_t j = 0; j < 8;) {
-        {
-          uint8_t n = 0;
-          for (; j + n < 8 && line & 1 == 0; ++n, line >>= 1)
-            ;
-          if (n && bg != color) { // need to draw background color
-            writeFillRect(x, y + j * size_y, size_x, size_y * n, bg);
-          }
-        }
-        {
-          uint8_t n = 0;
-          for (; j + n < 8 && line & 1 == 1; ++n, line >>= 1)
-            ;
-          if (n) { // need to draw foreground color
-            writeFillRect(x, y + j * size_y, size_x, size_y * n, color);
-          }
-        }
+      for (int8_t j = 0; j < 8;) {
+        uint8_t b0 = line & 1;
+        line >>= 1;
+        uint8_t count = 1;
+        for (; j + count < 8 && (line & 1) == b0; ++count, line >>= 1)
+          ;
       }
+      if (b0 || bg != color)
+        writeFillRect(x + i * size_x, y + j * size_y, size_x, n * size_y,
+                      b0 ? color : bg);
     }
     if (bg != color) { // If opaque, draw vertical line for last column
       writeFillRect(x, y, size_x, 8 * size_y, bg);
     }
     endWrite();
-    return;
   } else { // Custom font
 
     // Character is assumed previously filtered by write() to eliminate
