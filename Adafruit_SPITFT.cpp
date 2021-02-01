@@ -108,10 +108,11 @@ static const struct {
     @return  True if spiClass is one of the variant-provided SPI interfaces.
  */
 static bool isVariantDefinedSPIInterface(SPIClass *spiClass) {
-// Older variants assume a count of 1 without providing count explicitly.
 #if defined(SPI_INTERFACES_COUNT)
+/*! If count is explicitly given, use it. */
 #define REAL_SPI_INTERFACES_COUNT SPI_INTERFACES_COUNT
 #else
+/*! If count is unspecified, one interface is assumed. */
 #define REAL_SPI_INTERFACES_COUNT 1
 #endif
 
@@ -543,13 +544,9 @@ Adafruit_SPITFT::Adafruit_SPITFT(uint16_t w, uint16_t h, tftBusWidth busWidth,
 
 // end constructors -------
 
-
 // DESTRUCTOR ----------------------------------------------------------
 
-template <typename T>
-static void explicitlyDestroy(const T* obj) {
-    obj->~T();
-}
+template <typename T> static void explicitlyDestroy(const T *obj) { obj->~T(); }
 
 Adafruit_SPITFT::~Adafruit_SPITFT() {
   switch (connection) {
