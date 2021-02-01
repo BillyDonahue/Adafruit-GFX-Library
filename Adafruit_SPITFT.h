@@ -376,6 +376,13 @@ protected:
   inline void TFT_RD_HIGH(void);   // Parallel interface read high
   inline void TFT_RD_LOW(void);    // Parallel interface read low
 
+private:
+  /*!
+     Called by constructors, sets the connection data member and
+     default-initializes the corresponding anonymous union member.
+   */
+  void constructConnection(int conn);
+
   // CLASS INSTANCE VARIABLES --------------------------------------------
 
   // Here be dragons! There's a big union of three structures here --
@@ -383,7 +390,9 @@ protected:
   // interfaces. This is to save some memory, since a display's connection
   // will be only one of these. The order of some things is a little weird
   // in an attempt to get values to align and pack better in RAM.
-
+  //
+  // AVR cannot use placement-new, so it cannot initialize union members.
+  // So we require that all members of the union be trivial types.
 #if defined(USE_FAST_PINIO)
 #if defined(HAS_PORT_SET_CLR)
   PORTreg_t csPortSet; ///< PORT register for chip select SET
@@ -401,7 +410,7 @@ protected:
     struct {          //   Values specific to HARDWARE SPI:
       SPIClass *_spi; ///< SPI class pointer
 #if defined(SPI_HAS_TRANSACTION)
-      SPISettings settings; ///< SPI transaction settings
+      SPISettings *settings; ///< SPI transaction settings
 #else
     uint32_t _freq; ///< SPI bitrate (if no SPI transactions)
 #endif
