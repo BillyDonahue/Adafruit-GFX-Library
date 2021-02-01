@@ -543,6 +543,28 @@ Adafruit_SPITFT::Adafruit_SPITFT(uint16_t w, uint16_t h, tftBusWidth busWidth,
 
 // end constructors -------
 
+
+// DESTRUCTOR ----------------------------------------------------------
+
+template <typename T>
+static void explicitlyDestroy(const T* obj) {
+    obj->~T();
+}
+
+Adafruit_SPITFT::~Adafruit_SPITFT() {
+  switch (connection) {
+  case TFT_HARD_SPI:
+    explicitlyDestroy(&hwspi);
+    break;
+  case TFT_SOFT_SPI:
+    explicitlyDestroy(&swspi);
+    break;
+  case TFT_PARALLEL:
+    explicitlyDestroy(&tft8);
+    break;
+  }
+}
+
 // CLASS MEMBER FUNCTIONS --------------------------------------------------
 
 // begin() and setAddrWindow() MUST be declared by any subclass.
