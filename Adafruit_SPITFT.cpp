@@ -98,6 +98,14 @@ static const struct {
 
 // CONSTRUCTORS ------------------------------------------------------------
 
+#if defined(SPI_INTERFACES_COUNT)
+/*! If count is explicitly given, use it. */
+#define REAL_SPI_INTERFACES_COUNT SPI_INTERFACES_COUNT
+#else
+/*! If count is unspecified, one interface is assumed. */
+#define REAL_SPI_INTERFACES_COUNT 1
+#endif
+
 /*!
     @brief Is a SPI interface provided by the variant?
 
@@ -108,14 +116,6 @@ static const struct {
     @return  True if spiClass is one of the variant-provided SPI interfaces.
  */
 static bool isVariantDefinedSPIInterface(SPIClass *spiClass) {
-#if defined(SPI_INTERFACES_COUNT)
-/*! If count is explicitly given, use it. */
-#define REAL_SPI_INTERFACES_COUNT SPI_INTERFACES_COUNT
-#else
-/*! If count is unspecified, one interface is assumed. */
-#define REAL_SPI_INTERFACES_COUNT 1
-#endif
-
   return false
 #if REAL_SPI_INTERFACES_COUNT > 0
          || (spiClass == &SPI) // the 0-th SPI.
@@ -136,7 +136,6 @@ static bool isVariantDefinedSPIInterface(SPIClass *spiClass) {
          || (spiClass == &SPI5)
 #endif
       ;
-#undef REAL_SPI_INTERFACES_COUNT
 }
 
 /*!
