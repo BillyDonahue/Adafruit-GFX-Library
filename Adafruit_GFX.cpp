@@ -702,6 +702,172 @@ void Adafruit_GFX::fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1,
 
 // BITMAP / XBITMAP / GRAYSCALE / RGB BITMAP FUNCTIONS ---------------------
 
+struct PgmByteSource {
+  static uint8_t load(const uint8_t *data) { return pgm_read_byte(data); }
+};
+struct RamByteSource {
+  static uint8_t load(const uint8_t *data) { return *data; }
+};
+
+template <typename ByteSource> struct BitmapLoader {
+  BitmapLoader(const uint8_t *data, uint16_t w) : data(data), w(w), i(0) {}
+  bool operator()() {
+    if (i & 7)
+      byte <<= 1;
+    else {
+      byte = ByteSource::load(data);
+      ++data;
+    }
+    if (++i == w)
+      i = 0;
+    return byte & 0x80;
+  }
+  const uint8_t *data;
+  uint16_t w, i;
+  uint8_t byte;
+};
+
+// XbmLoader is nearly identical to BitmapLoader, except that the bit
+// order is reversed (left-to-right = LSB to MSB):
+template <typename ByteSource> struct XbmLoader {
+  XbmLoader(const uint8_t *data, uint16_t w) : data(data), w(w), i(0) {}
+  bool operator()() {
+    if (i & 7)
+      byte >>= 1;
+    else {
+      byte = ByteSource::load(data);
+      ++data;
+    }
+    if (++i == w)
+      i = 0;
+    return byte & 1;
+  }
+  const uint8_t *data;
+  uint16_t w, i;
+  uint8_t byte;
+};
+
+template <typename ByteSource> struct GrayscaleLoader {
+  explicit GrayscaleLoader(const uint8_t *data) : data(data) {}
+  bool operator()() {
+    uint8_t pixel = ByteSource::load(data);
+    ++data;
+    return pixel;
+  }
+  const uint8_t *data;
+};
+
+template <typename ByteSource> struct MaskedGrayscaleLoader {
+  struct Color {
+      bool draw;
+      uint8_t gray;
+  };
+  MaskedGrayscaleLoader(const uint8_t *data, const uint8_t *mask, uint16_t w)
+      : maskLoader(mask, w), grayLoader(data) {}
+  Color operator()() {
+    Color value{maskLoader(), grayLoader()};
+    return value;
+  }
+  BitmapLoader<ByteSource> maskLoader;
+  GrayscaleLoader<ByteSource> grayLoader;
+};
+
+
+struct DrawBitTransparent {
+  void operator()(Adafruit_GFX *gfx, uint16_t x, uint16_t y, bool bit) const {
+    if (bit)
+      gfx->writePixel(x, y, color);
+  }
+
+  uint16_t color;
+};
+
+struct DrawBitWithBackground {
+  void operator()(Adafruit_GFX *gfx, uint16_t x, uint16_t y, bool bit) const {
+    gfx->writePixel(x, y, bit ? color : bg);
+  }
+
+  uint16_t color;
+  uint16_t bg;
+};
+
+struct DrawGrayscale {
+  void operator()(Adafruit_GFX *gfx, uint16_t x, uint16_t y, uint8_t gray) const {
+    gfx->writePixel(x, y, gray);
+  }
+};
+
+struct DrawMaskedGrayscale {
+  void operator()(Adafruit_GFX *gfx, uint16_t x, uint16_t y, MaskedGrayscaleLoader::Color value) const {
+    if (value.draw)
+        grayGray.writePixel(gfx, x, y, value.gray);
+  }
+  DrawGrayscale drawGray;
+};
+
+struct PgmWordSource {
+    static uint16_t load(const uint16_t *data) { return pgm_read_word(data); }
+};
+struct RamWordSource {
+    static uint16_t load(const uint16_t *data) { return *data; }
+};
+
+template <typename WordSource>
+struct RGBLoader {
+    RGBLoader(const uint16_t* data) : data(data) {}
+    uint16_t operator()() {
+        uint16_t pixel = WordSource::load(data);
+        ++data;
+        return pixel;
+    }
+    const uint16_t *data;
+}
+
+struct DrawRGB {
+  void operator()(Adafruit_GFX *gfx, uint16_t x, uint16_t y, uint16_t rgbColor) const {
+    gfx->writePixel(x, y, rgbColor);
+  }
+};
+
+template <typename MaskByteSource, typename RgbWordSource>
+struct MaskedRGBLoader {
+    struct Color {
+        bool draw;
+        uint16_t value;
+    };
+    MaskedRGBLoader(const uint16_t *bitmap, const uint8* mask, int16_t w)
+        : maskLoader(mask, w), rgbLoader(bitmap) {}
+    Color operator()() {
+        Color value{maskLoader(), rgbLoader()};
+        return value;
+    }
+    {bitmap, mask, w}, DrawRGB{}
+
+    BitmapLoader<MaskByteSource> maskLoader;
+    RGBLoader<RgbWordSource> rgbLoader;
+};
+
+struct DrawMaskedRGB {
+  void operator()(Adafruit_GFX *gfx, uint16_t x, uint16_t y, MaskedRGBLoader::Color color) const {
+    if (color.draw)
+      gfx->writePixel(x, y, color.value);
+  }
+}
+
+
+template <typename BitmapLoader, typename LoadPixel>
+static void bitmapEngine(Adafruit_GFX *gfx, int16_t x, int16_t y, int16_t w,
+                         int16_t h, const LoadPixel &loadPixel,
+                         const DrawPixel& drawPixel) {
+  gfx->startWrite();
+  for (int16_t j = 0; j < h; j++) {
+    for (int16_t i = 0; i < w; i++) {
+      drawPixel(gfx, x + i, y + j, loadPixel());
+    }
+  }
+  gfx->endWrite();
+}
+
 /**************************************************************************/
 /*!
    @brief      Draw a PROGMEM-resident 1-bit image at the specified (x,y)
@@ -716,22 +882,8 @@ void Adafruit_GFX::fillTriangle(int16_t x0, int16_t y0, int16_t x1, int16_t y1,
 /**************************************************************************/
 void Adafruit_GFX::drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
                               int16_t w, int16_t h, uint16_t color) {
-
-  int16_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
-  uint8_t byte = 0;
-
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      if (i & 7)
-        byte <<= 1;
-      else
-        byte = pgm_read_byte(&bitmap[j * byteWidth + i / 8]);
-      if (byte & 0x80)
-        writePixel(x + i, y, color);
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, BitmapLoader<PgmByteSource>{bitmap, w},
+               DrawBitTransparent(color));
 }
 
 /**************************************************************************/
@@ -751,21 +903,8 @@ void Adafruit_GFX::drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
 void Adafruit_GFX::drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
                               int16_t w, int16_t h, uint16_t color,
                               uint16_t bg) {
-
-  int16_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
-  uint8_t byte = 0;
-
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      if (i & 7)
-        byte <<= 1;
-      else
-        byte = pgm_read_byte(&bitmap[j * byteWidth + i / 8]);
-      writePixel(x + i, y, (byte & 0x80) ? color : bg);
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, BitmapLoader<PgmByteSource>{bitmap, w},
+               DrawBitBackgoundFill(color, bg));
 }
 
 /**************************************************************************/
@@ -782,22 +921,8 @@ void Adafruit_GFX::drawBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
 /**************************************************************************/
 void Adafruit_GFX::drawBitmap(int16_t x, int16_t y, uint8_t *bitmap, int16_t w,
                               int16_t h, uint16_t color) {
-
-  int16_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
-  uint8_t byte = 0;
-
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      if (i & 7)
-        byte <<= 1;
-      else
-        byte = bitmap[j * byteWidth + i / 8];
-      if (byte & 0x80)
-        writePixel(x + i, y, color);
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, BitmapLoader<RamByteSource>{bitmap, w},
+               DrawBitTransparent(color));
 }
 
 /**************************************************************************/
@@ -816,21 +941,8 @@ void Adafruit_GFX::drawBitmap(int16_t x, int16_t y, uint8_t *bitmap, int16_t w,
 /**************************************************************************/
 void Adafruit_GFX::drawBitmap(int16_t x, int16_t y, uint8_t *bitmap, int16_t w,
                               int16_t h, uint16_t color, uint16_t bg) {
-
-  int16_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
-  uint8_t byte = 0;
-
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      if (i & 7)
-        byte <<= 1;
-      else
-        byte = bitmap[j * byteWidth + i / 8];
-      writePixel(x + i, y, (byte & 0x80) ? color : bg);
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, BitmapLoader<RamByteSource>{bitmap, w},
+               DrawBitBackgroundFill(color, bg));
 }
 
 /**************************************************************************/
@@ -850,24 +962,8 @@ void Adafruit_GFX::drawBitmap(int16_t x, int16_t y, uint8_t *bitmap, int16_t w,
 /**************************************************************************/
 void Adafruit_GFX::drawXBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
                                int16_t w, int16_t h, uint16_t color) {
-
-  int16_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
-  uint8_t byte = 0;
-
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      if (i & 7)
-        byte >>= 1;
-      else
-        byte = pgm_read_byte(&bitmap[j * byteWidth + i / 8]);
-      // Nearly identical to drawBitmap(), only the bit order
-      // is reversed here (left-to-right = LSB to MSB):
-      if (byte & 0x01)
-        writePixel(x + i, y, color);
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, XbmLoader<PgmByteSource>{bitmap, w},
+               DrawBitTransparent(color));
 }
 
 /**************************************************************************/
@@ -889,23 +985,8 @@ void Adafruit_GFX::drawXBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
 void Adafruit_GFX::drawXBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
                                int16_t w, int16_t h, uint16_t color,
                                uint16_t bg) {
-
-  int16_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
-  uint8_t byte = 0;
-
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      if (i & 7)
-        byte >>= 1;
-      else
-        byte = pgm_read_byte(&bitmap[j * byteWidth + i / 8]);
-      // Nearly identical to drawBitmap(), only the bit order
-      // is reversed here (left-to-right = LSB to MSB):
-      writePixel(x + i, y, (byte & 0x01) ? color : bg);
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, XbmLoader<PgmByteSource>{bitmap, w},
+               DrawBitWithBackground(color, bg));
 }
 
 /**************************************************************************/
@@ -923,13 +1004,8 @@ void Adafruit_GFX::drawXBitmap(int16_t x, int16_t y, const uint8_t bitmap[],
 void Adafruit_GFX::drawGrayscaleBitmap(int16_t x, int16_t y,
                                        const uint8_t bitmap[], int16_t w,
                                        int16_t h) {
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      writePixel(x + i, y, (uint8_t)pgm_read_byte(&bitmap[j * w + i]));
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, GrayscaleLoader<PgmByteSource>{bitmap},
+               DrawGrapscale{});
 }
 
 /**************************************************************************/
@@ -946,13 +1022,8 @@ void Adafruit_GFX::drawGrayscaleBitmap(int16_t x, int16_t y,
 /**************************************************************************/
 void Adafruit_GFX::drawGrayscaleBitmap(int16_t x, int16_t y, uint8_t *bitmap,
                                        int16_t w, int16_t h) {
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      writePixel(x + i, y, bitmap[j * w + i]);
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, GrayscaleLoader<RamByteSource>{bitmap},
+               DrawGrapscale{});
 }
 
 /**************************************************************************/
@@ -974,21 +1045,8 @@ void Adafruit_GFX::drawGrayscaleBitmap(int16_t x, int16_t y,
                                        const uint8_t bitmap[],
                                        const uint8_t mask[], int16_t w,
                                        int16_t h) {
-  int16_t bw = (w + 7) / 8; // Bitmask scanline pad = whole byte
-  uint8_t byte = 0;
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      if (i & 7)
-        byte <<= 1;
-      else
-        byte = pgm_read_byte(&mask[j * bw + i / 8]);
-      if (byte & 0x80) {
-        writePixel(x + i, y, (uint8_t)pgm_read_byte(&bitmap[j * w + i]));
-      }
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, MaskedGrayscaleLoader<PgmByteSource>{bitmap, mask, w},
+               DrawMaskedGrayscale{});
 }
 
 /**************************************************************************/
@@ -1008,21 +1066,8 @@ void Adafruit_GFX::drawGrayscaleBitmap(int16_t x, int16_t y,
 /**************************************************************************/
 void Adafruit_GFX::drawGrayscaleBitmap(int16_t x, int16_t y, uint8_t *bitmap,
                                        uint8_t *mask, int16_t w, int16_t h) {
-  int16_t bw = (w + 7) / 8; // Bitmask scanline pad = whole byte
-  uint8_t byte = 0;
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      if (i & 7)
-        byte <<= 1;
-      else
-        byte = mask[j * bw + i / 8];
-      if (byte & 0x80) {
-        writePixel(x + i, y, bitmap[j * w + i]);
-      }
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, MaskedGrayscaleLoader<RamByteSource>{bitmap, mask, w},
+               DrawMaskedGrayscale{});
 }
 
 /**************************************************************************/
@@ -1038,13 +1083,7 @@ void Adafruit_GFX::drawGrayscaleBitmap(int16_t x, int16_t y, uint8_t *bitmap,
 /**************************************************************************/
 void Adafruit_GFX::drawRGBBitmap(int16_t x, int16_t y, const uint16_t bitmap[],
                                  int16_t w, int16_t h) {
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      writePixel(x + i, y, pgm_read_word(&bitmap[j * w + i]));
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, RGBLoader<PgmWordSource>{bitmap}, DrawRGB{});
 }
 
 /**************************************************************************/
@@ -1060,13 +1099,7 @@ void Adafruit_GFX::drawRGBBitmap(int16_t x, int16_t y, const uint16_t bitmap[],
 /**************************************************************************/
 void Adafruit_GFX::drawRGBBitmap(int16_t x, int16_t y, uint16_t *bitmap,
                                  int16_t w, int16_t h) {
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      writePixel(x + i, y, bitmap[j * w + i]);
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, RGBLoader<RamWordSource>{bitmap}, DrawRGB{});
 }
 
 /**************************************************************************/
@@ -1085,21 +1118,7 @@ void Adafruit_GFX::drawRGBBitmap(int16_t x, int16_t y, uint16_t *bitmap,
 /**************************************************************************/
 void Adafruit_GFX::drawRGBBitmap(int16_t x, int16_t y, const uint16_t bitmap[],
                                  const uint8_t mask[], int16_t w, int16_t h) {
-  int16_t bw = (w + 7) / 8; // Bitmask scanline pad = whole byte
-  uint8_t byte = 0;
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      if (i & 7)
-        byte <<= 1;
-      else
-        byte = pgm_read_byte(&mask[j * bw + i / 8]);
-      if (byte & 0x80) {
-        writePixel(x + i, y, pgm_read_word(&bitmap[j * w + i]));
-      }
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, MaskedRGBLoader<PgmWordSource, PgmByteSource>{bitmap, mask, w}, DrawMaskedRGB{});
 }
 
 /**************************************************************************/
@@ -1118,21 +1137,7 @@ void Adafruit_GFX::drawRGBBitmap(int16_t x, int16_t y, const uint16_t bitmap[],
 /**************************************************************************/
 void Adafruit_GFX::drawRGBBitmap(int16_t x, int16_t y, uint16_t *bitmap,
                                  uint8_t *mask, int16_t w, int16_t h) {
-  int16_t bw = (w + 7) / 8; // Bitmask scanline pad = whole byte
-  uint8_t byte = 0;
-  startWrite();
-  for (int16_t j = 0; j < h; j++, y++) {
-    for (int16_t i = 0; i < w; i++) {
-      if (i & 7)
-        byte <<= 1;
-      else
-        byte = mask[j * bw + i / 8];
-      if (byte & 0x80) {
-        writePixel(x + i, y, bitmap[j * w + i]);
-      }
-    }
-  }
-  endWrite();
+  bitmapEngine(this, x, y, w, h, MaskedRGBLoader<RamWordSource, RamByteSource>{bitmap, mask, w}, DrawMaskedRGB{});
 }
 
 // TEXT- AND CHARACTER-HANDLING FUNCTIONS ----------------------------------
